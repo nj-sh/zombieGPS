@@ -266,11 +266,10 @@ export function setupSocketHandlers(io) {
 
                   // Respawn new items + safe zones after a short delay
                   setTimeout(() => {
-                    gameItems = spawnItems();
-                    activeSafeZones = getSafeZonesNear(
-                      activeSafeZones[0]?.latitude || 40.7128,
-                      activeSafeZones[0]?.longitude || -74.0060
-                    );
+                    const centerLat = activeSafeZones[0]?.latitude || 40.7128;
+                    const centerLng = activeSafeZones[0]?.longitude || -74.0060;
+                    gameItems = spawnItems(centerLat, centerLng);
+                    activeSafeZones = getSafeZonesNear(centerLat, centerLng);
                     io.emit(SOCKET_EVENTS.ITEM_SPAWNED, { items: gameItems });
                     console.log('🔄 New round items + safe zones spawned!');
                   }, 5000);

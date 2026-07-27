@@ -166,6 +166,9 @@ class Game {
         // Re-render HUD counts after init
         this.updateOnlineCount();
 
+        // Update inventory UI now that HUD elements exist
+        this.updateInventoryUI();
+
         await window.deviceOrientation.requestPermission();
         window.deviceOrientation.start();
 
@@ -329,11 +332,13 @@ class Game {
     this.safeZones = data.safeZones || [];
     this.extractionPoints = data.extractionPoints || [];
 
-    // Setup player inventory if missing
-    this.player.inventory = this.player.inventory || [
-      { type: 'medicine', name: 'Medicine' },
-      { type: 'medicine', name: 'Medicine' },
-    ];
+    // Setup player inventory if missing or empty ([] is truthy in JS, so check length)
+    if (!this.player.inventory || this.player.inventory.length === 0) {
+      this.player.inventory = [
+        { type: 'medicine', name: 'Medicine' },
+        { type: 'medicine', name: 'Medicine' },
+      ];
+    }
 
     if (window.playerRenderer) {
       window.playerRenderer.setLocalPlayerId(this.player.id);
