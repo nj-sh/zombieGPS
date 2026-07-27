@@ -14,14 +14,24 @@ function randomPosition(lat, lng, radiusKm = 5) {
 }
 
 /**
- * Safe zone definitions — must stay in sync with supabase.js SafeZoneDefaults.
- * Used to spawn loot items at each location.
+ * Generate safe zone locations near a center point.
  */
-const SAFE_ZONE_LOCATIONS = [
-  { id: 'sz-1', type: 'hospital', name: 'Central Hospital', latitude: 40.7128, longitude: -74.0060, radius_m: 30 },
-  { id: 'sz-2', type: 'police_station', name: 'City Police HQ', latitude: 40.7150, longitude: -74.0080, radius_m: 25 },
-  { id: 'sz-3', type: 'military_base', name: 'Fort Refuge', latitude: 40.7200, longitude: -74.0100, radius_m: 40 },
-];
+function generateSafeZonesNear(lat, lng) {
+  return [
+    {
+      id: 'sz-1', type: 'hospital', name: 'Central Hospital',
+      latitude: lat + 0.002, longitude: lng + 0.003, radius_m: 30,
+    },
+    {
+      id: 'sz-2', type: 'police_station', name: 'City Police HQ',
+      latitude: lat + 0.006, longitude: lng - 0.002, radius_m: 25,
+    },
+    {
+      id: 'sz-3', type: 'military_base', name: 'Fort Refuge',
+      latitude: lat - 0.004, longitude: lng + 0.005, radius_m: 40,
+    },
+  ];
+}
 
 /**
  * Spawn loot items at a specific safe zone.
@@ -67,6 +77,7 @@ function spawnSafeZoneLoot(zone, zoneIndex) {
 
 /**
  * Spawn initial game items — both world-spawn and safe zone loot.
+ * Items and safe zones are centered on the given position (player's GPS).
  */
 export function spawnItems(centerLat = 40.7128, centerLng = -74.0060) {
   const items = [];
@@ -110,13 +121,21 @@ export function spawnItems(centerLat = 40.7128, centerLng = -74.0060) {
     });
   }
 
-  // ── Safe zone loot items ──
-  SAFE_ZONE_LOCATIONS.forEach((zone, i) => {
+  // ── Safe zone loot items — generated near the player ──
+  const safeZones = generateSafeZonesNear(centerLat, centerLng);
+  safeZones.forEach((zone, i) => {
     const loot = spawnSafeZoneLoot(zone, i);
     items.push(...loot);
   });
 
   return items;
+}
+
+/**
+ * Get safe zones generated near a player position (for client display).
+ */
+export function getSafeZonesNear(lat, lng) {
+  return generateSafeZonesNear(lat, lng);
 }
 
 /**

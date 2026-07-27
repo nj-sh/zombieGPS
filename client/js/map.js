@@ -45,22 +45,12 @@ class MapManager {
       zoomDelta: 1,
     });
 
-    // Satellite tile layer (Esri World Imagery)
-    this.tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 20,
+    // OpenStreetMap tiles (works worldwide, includes labels)
+    this.tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
       minZoom: 3,
-      attribution: '&copy; Esri, Maxar, Earthstar Geographics',
+      attribution: '&copy; OpenStreetMap contributors',
       noWrap: true,
-    }).addTo(this.map);
-
-    // Street names + labels overlay (CartoDB dark only labels — transparent bg, white text)
-    this.labelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
-      maxZoom: 20,
-      minZoom: 3,
-      subdomains: 'abcd',
-      noWrap: true,
-      pane: 'overlayPane',
-      opacity: 0.9,
     }).addTo(this.map);
 
     // Create layers

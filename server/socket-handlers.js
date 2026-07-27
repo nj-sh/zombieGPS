@@ -4,7 +4,7 @@ import {
   calculateDistance, checkInfection, validatePosition, isInSafeZone, canCollectItem,
   createExtractionPoint, canEscape, canCraftRadio, healInSafeZone, generateId
 } from './game-logic.js';
-import { spawnItems, checkItemCollection } from './items-spawner.js';
+import { spawnItems, checkItemCollection, getSafeZonesNear } from './items-spawner.js';
 
 /**
  * Initialize all Socket.IO event handlers.
@@ -19,6 +19,8 @@ export function setupSocketHandlers(io) {
   let gameItems = [];
   // Active extraction points
   let extractionPoints = [];
+  // Dynamic safe zones (generated near first player)
+  let activeSafeZones = [...SafeZoneDefaults];
   // Track safe zone state per player: playerId → { inside: bool, zoneId: string }
   const playerSafeZoneState = new Map();
   // Intervals (stored for cleanup)
@@ -49,7 +51,7 @@ export function setupSocketHandlers(io) {
       if (player.team !== TEAMS.SURVIVOR || player.status !== PLAYER_STATUS.ACTIVE) continue;
       if (player.health >= 100) continue;
 
-      const zone = isInSafeZone(player.latitude, player.longitude, SafeZoneDefaults);
+      const zone = isInSafeZone(player.latitude, player.longitude, activeSafeZones);
       if (zone) {
         const newHealth = healInSafeZone(player);
         if (newHealth !== player.health) {
@@ -119,7 +121,7 @@ export function setupSocketHandlers(io) {
             mech_parts: p.mech_parts,
             has_radio: p.has_radio,
           })),
-          safeZones: SafeZoneDefaults,
+          safeZones: activeSafeZones,
           items: gameItems,
           extractionPoints: extractionPoints.filter(ep => ep.active),
         });
@@ -135,9 +137,12 @@ export function setupSocketHandlers(io) {
           status: player.status,
         });
 
-        // Spawn initial items if needed
+        // Spawn initial items if needed (centered on this player's position)
         if (gameItems.length === 0) {
-          gameItems = spawnItems();
+          const playerLat = player.latitude || latitude || 40.7128;
+          const playerLng = player.longitude || longitude || -74.0060;
+          gameItems = spawnItems(playerLat, playerLng);
+          activeSafeZones = getSafeZonesNear(playerLat, playerLng);
           io.emit(SOCKET_EVENTS.ITEM_SPAWNED, { items: gameItems });
           startItemPing();
         }
@@ -181,8 +186,8 @@ export function setupSocketHandlers(io) {
 
       // ── Safe Zone Entry/Exit Detection ──
       if (player.team === TEAMS.SURVIVOR) {
-        const prevZone = isInSafeZone(prevLat, prevLng, SafeZoneDefaults);
-        const currentZone = isInSafeZone(latitude, longitude, SafeZoneDefaults);
+        const prevZone = isInSafeZone(prevLat, prevLng, activeSafeZones);
+        const currentZone = isInSafeZone(latitude, longitude, activeSafeZones);
 
         const prevState = playerSafeZoneState.get(playerId);
 
@@ -210,7 +215,7 @@ export function setupSocketHandlers(io) {
 
       // ── Infection Check ──
       if (player.team === TEAMS.SURVIVOR) {
-        const currentZone = isInSafeZone(latitude, longitude, SafeZoneDefaults);
+        const currentZone = isInSafeZone(latitude, longitude, activeSafeZones);
         if (!currentZone) {
           for (const [otherId, otherPlayer] of activePlayers) {
             if (otherId !== playerId && otherPlayer.team === TEAMS.ZOMBIE && otherPlayer.status === PLAYER_STATUS.ACTIVE) {
@@ -259,11 +264,15 @@ export function setupSocketHandlers(io) {
                   // Clear existing extraction points
                   extractionPoints = [];
 
-                  // Respawn new items after a short delay
+                  // Respawn new items + safe zones after a short delay
                   setTimeout(() => {
                     gameItems = spawnItems();
+                    activeSafeZones = getSafeZonesNear(
+                      activeSafeZones[0]?.latitude || 40.7128,
+                      activeSafeZones[0]?.longitude || -74.0060
+                    );
                     io.emit(SOCKET_EVENTS.ITEM_SPAWNED, { items: gameItems });
-                    console.log('🔄 New round items spawned!');
+                    console.log('🔄 New round items + safe zones spawned!');
                   }, 5000);
                 }
 
