@@ -191,18 +191,14 @@
         <div class="hud-gps-info" id="hud-gps-speed">Speed: --</div>
       </div>
 
-      <!-- Bottom Right: Compass -->
+      <!-- Bottom Right: Compass + Fullscreen -->
       <div class="hud-bottom-right">
         <div class="hud-compass">
           <div class="hud-compass-label">N</div>
           <div class="hud-compass-needle" id="hud-compass-needle"></div>
           <div class="hud-compass-ring"></div>
         </div>
-        <button
-          style="width:36px;height:36px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);border-radius:50%;color:white;font-size:0.9rem;cursor:pointer;pointer-events:auto;display:flex;align-items:center;justify-content:center;"
-          onclick="document.documentElement.requestFullscreen?.()"
-          title="Fullscreen"
-        >⛶</button>
+        <button id="hud-fullscreen-btn" class="hud-fullscreen-btn" title="Toggle fullscreen">⛶</button>
       </div>
 
       <!-- Center Bottom: Hearts & Stamina -->

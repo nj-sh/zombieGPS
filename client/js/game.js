@@ -55,6 +55,13 @@ class Game {
       this.attemptEscape();
     });
 
+    // Setup fullscreen toggle
+    document.getElementById('hud-fullscreen-btn')?.addEventListener('click', () => {
+      this.toggleFullscreen();
+    });
+    document.addEventListener('fullscreenchange', () => this.updateFullscreenIcon());
+    document.addEventListener('webkitfullscreenchange', () => this.updateFullscreenIcon());
+
     // Handle orientation change
     window.addEventListener('orientationchange', () => {
       setTimeout(() => window.mapManager.resize(), 300);
@@ -830,6 +837,37 @@ class Game {
         this.survivalTime = Math.floor((Date.now() - this.survivalStartTime) / 1000);
       }
     }, 1000);
+  }
+
+  /**
+   * Toggle fullscreen mode.
+   */
+  toggleFullscreen() {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+      const el = document.documentElement;
+      if (el.requestFullscreen) {
+        el.requestFullscreen();
+      } else if (el.webkitRequestFullscreen) {
+        el.webkitRequestFullscreen();
+      }
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
+    }
+  }
+
+  /**
+   * Update fullscreen button icon.
+   */
+  updateFullscreenIcon() {
+    const btn = document.getElementById('hud-fullscreen-btn');
+    if (!btn) return;
+    const isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
+    btn.textContent = isFullscreen ? '✕' : '⛶';
+    btn.title = isFullscreen ? 'Exit fullscreen' : 'Fullscreen';
   }
 
   /**

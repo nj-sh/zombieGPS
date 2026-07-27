@@ -14,10 +14,64 @@ function randomPosition(lat, lng, radiusKm = 5) {
 }
 
 /**
- * Spawn initial game items.
+ * Safe zone definitions — must stay in sync with supabase.js SafeZoneDefaults.
+ * Used to spawn loot items at each location.
+ */
+const SAFE_ZONE_LOCATIONS = [
+  { id: 'sz-1', type: 'hospital', name: 'Central Hospital', latitude: 40.7128, longitude: -74.0060, radius_m: 30 },
+  { id: 'sz-2', type: 'police_station', name: 'City Police HQ', latitude: 40.7150, longitude: -74.0080, radius_m: 25 },
+  { id: 'sz-3', type: 'military_base', name: 'Fort Refuge', latitude: 40.7200, longitude: -74.0100, radius_m: 40 },
+];
+
+/**
+ * Spawn loot items at a specific safe zone.
+ */
+function spawnSafeZoneLoot(zone, zoneIndex) {
+  const items = [];
+  const lootTable = [
+    { type: ITEM_TYPES.HEALTH_PACK, count: 2 },
+    { type: ITEM_TYPES.AMMO, count: 1 },
+    { type: ITEM_TYPES.FOOD, count: 1 },
+    { type: ITEM_TYPES.MEDICINE, count: 1 },
+    { type: ITEM_TYPES.ENERGY_DRINK, count: 1 },
+  ];
+
+  // Special loot per zone type
+  if (zone.type === 'hospital') {
+    lootTable.push({ type: ITEM_TYPES.HEALTH_PACK, count: 2 }); // Extra meds at hospital
+  } else if (zone.type === 'police_station') {
+    lootTable.push({ type: ITEM_TYPES.AMMO, count: 2 }); // Extra ammo at police
+  } else if (zone.type === 'military_base') {
+    lootTable.push({ type: ITEM_TYPES.ARMOR, count: 1 }); // Armor at military
+    lootTable.push({ type: ITEM_TYPES.KEYS, count: 1 });  // Keys at military
+  }
+
+  let idx = 0;
+  for (const entry of lootTable) {
+    for (let j = 0; j < entry.count; j++) {
+      const pos = randomPosition(zone.latitude, zone.longitude, zone.radius_m / 1000);
+      items.push({
+        id: `loot-${zoneIndex}-${idx++}`,
+        type: entry.type,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        is_collected: false,
+        fromSafeZone: zone.id,  // Tag so clients know it's safe-zone loot
+      });
+    }
+    idx++;
+  }
+
+  return items;
+}
+
+/**
+ * Spawn initial game items — both world-spawn and safe zone loot.
  */
 export function spawnItems(centerLat = 40.7128, centerLng = -74.0060) {
   const items = [];
+
+  // ── World-spawn items ──
 
   // Spawn 3 mech parts (required for escape)
   for (let i = 0; i < GAME_CONFIG.MECH_PARTS_REQUIRED; i++) {
@@ -55,6 +109,12 @@ export function spawnItems(centerLat = 40.7128, centerLng = -74.0060) {
       is_collected: false,
     });
   }
+
+  // ── Safe zone loot items ──
+  SAFE_ZONE_LOCATIONS.forEach((zone, i) => {
+    const loot = spawnSafeZoneLoot(zone, i);
+    items.push(...loot);
+  });
 
   return items;
 }

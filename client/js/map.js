@@ -10,7 +10,7 @@ class MapManager {
     this.playerRenderer = null;
     this.isInitialized = false;
     this.currentCenter = [0, 0];
-    this.currentZoom = 18;
+    this.currentZoom = 16;
     this.itemMarkers = new Map();
     this.safeZoneMarkers = new Map();
     this.extractionPointMarkers = new Map();
@@ -33,22 +33,34 @@ class MapManager {
       zoomControl: false,
       attributionControl: false,
       dragging: true,
-      scrollWheelZoom: false, // Disable scroll zoom for mobile
-      doubleClickZoom: false,
+      scrollWheelZoom: true,  // Allow scroll-to-zoom
+      doubleClickZoom: true,
       touchZoom: true,
       boxZoom: false,
       keyboard: false,
       fadeAnimation: true,
       zoomAnimation: true,
       markerZoomAnimation: true,
+      zoomSnap: 0.5,
+      zoomDelta: 1,
     });
 
     // Satellite tile layer (Esri World Imagery)
     this.tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 19,
+      maxZoom: 20,
       minZoom: 3,
       attribution: '&copy; Esri, Maxar, Earthstar Geographics',
       noWrap: true,
+    }).addTo(this.map);
+
+    // Street names + labels overlay (CartoDB light only labels)
+    this.labelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+      maxZoom: 20,
+      minZoom: 3,
+      subdomains: 'abcd',
+      noWrap: true,
+      pane: 'overlayPane',
+      opacity: 0.85,
     }).addTo(this.map);
 
     // Create layers
@@ -185,7 +197,7 @@ class MapManager {
   }
 
   /**
-   * Add a safe zone marker.
+   * Add a safe zone marker — now with loot indicator.
    */
   addSafeZone(zone) {
     if (!this.map) return;
@@ -198,16 +210,25 @@ class MapManager {
 
     const icon = L.divIcon({
       html: `
-        <div class="safe-zone-marker">
+        <div class="safe-zone-marker" style="position:relative;">
           ${labels[zone.type] || '🏠'}
+          <div style="
+            position:absolute;top:-6px;right:-6px;
+            font-size:0.7rem;
+            filter:drop-shadow(0 0 4px rgba(255,215,0,0.8));
+            animation:glow-pulse 1.5s ease-in-out infinite;
+          ">🎒</div>
         </div>
         <div style="text-align:center;font-size:0.65rem;color:var(--safe-zone);text-shadow:0 1px 3px rgba(0,0,0,0.8);margin-top:2px;">
           ${zone.name}
         </div>
+        <div style="text-align:center;font-size:0.55rem;color:var(--item-gold);text-shadow:0 1px 3px rgba(0,0,0,0.8);opacity:0.8;">
+          🎒 Loot
+        </div>
       `,
       className: '',
-      iconSize: [60, 50],
-      iconAnchor: [30, 25],
+      iconSize: [60, 60],
+      iconAnchor: [30, 30],
     });
 
     const marker = L.marker([zone.latitude, zone.longitude], {
@@ -225,7 +246,18 @@ class MapManager {
       opacity: 0.3,
     }).addTo(this.safeZoneLayer);
 
-    this.safeZoneMarkers.set(zone.id, { marker, circle });
+    // Inner ring — lootable area highlight
+    const lootCircle = L.circle([zone.latitude, zone.longitude], {
+      radius: zone.radius_m * 0.5,
+      color: '#ffd700',
+      fillColor: '#ffd700',
+      fillOpacity: 0.04,
+      weight: 1,
+      opacity: 0.2,
+      dashArray: '4, 6',
+    }).addTo(this.safeZoneLayer);
+
+    this.safeZoneMarkers.set(zone.id, { marker, circle, lootCircle });
   }
 
   /**
