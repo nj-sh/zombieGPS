@@ -25,6 +25,7 @@ class HUD {
       // Bottom Left
       gpsAccuracy: document.getElementById('hud-gps-accuracy'),
       gpsSpeed: document.getElementById('hud-gps-speed'),
+      gpsLocation: document.getElementById('hud-gps-location'),
 
       // Bottom Right
       compassNeedle: document.getElementById('hud-compass-needle'),
@@ -184,6 +185,15 @@ class HUD {
   }
 
   /**
+   * Update current location name (reverse geocode result).
+   */
+  updateLocation(placeName) {
+    if (this.elements.gpsLocation) {
+      this.elements.gpsLocation.textContent = `📍 ${placeName}`;
+    }
+  }
+
+  /**
    * Update compass heading.
    */
   updateCompass(heading) {
@@ -234,6 +244,20 @@ class HUD {
     if (this.elements.escapeStatus) {
       this.elements.escapeStatus.textContent = `🚁 Escaped: ${escapedCount}/${maxCapacity}`;
       this.elements.escapeStatus.style.color = 'var(--neon-green)';
+    }
+  }
+
+  /**
+   * Update the inventory bag display with item count.
+   */
+  updateInventoryBag(items) {
+    const bagEl = document.getElementById('hud-inventory-bag');
+    if (!bagEl) return;
+    const count = items ? items.length : 0;
+    const badge = bagEl.querySelector('.hud-bag-badge');
+    if (badge) {
+      badge.textContent = count;
+      badge.style.display = count > 0 ? 'flex' : 'none';
     }
   }
 

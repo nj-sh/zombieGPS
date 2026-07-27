@@ -185,10 +185,11 @@
         <div class="hud-stat">Zombies: <span class="value zombie-count" id="hud-zombies">0</span></div>
       </div>
 
-      <!-- Bottom Left: GPS Info -->
+      <!-- Bottom Left: GPS Info + Location -->
       <div class="hud-bottom-left">
         <div class="hud-gps-info" id="hud-gps-accuracy">GPS: ±--</div>
         <div class="hud-gps-info" id="hud-gps-speed">Speed: --</div>
+        <div class="hud-location" id="hud-gps-location">📍 Detecting location...</div>
       </div>
 
       <!-- Bottom Right: Compass + Fullscreen -->
@@ -264,8 +265,14 @@
         ">🚁 ESCAPE</button>
       </div>
 
-      <!-- Inventory -->
-      <div class="hud-inventory" id="hud-inventory">
+      <!-- Inventory Bag Button -->
+      <button class="hud-bag-btn" id="hud-inventory-bag" title="Inventory">
+        🎒
+        <span class="hud-bag-badge" id="hud-bag-badge">0</span>
+      </button>
+
+      <!-- Inventory Bar (hidden by default, shown when bag is clicked) -->
+      <div class="hud-inventory" id="hud-inventory" style="display:none;">
         <div class="hud-inventory-slot"></div>
         <div class="hud-inventory-slot"></div>
         <div class="hud-inventory-slot"></div>

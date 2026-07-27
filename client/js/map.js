@@ -53,14 +53,14 @@ class MapManager {
       noWrap: true,
     }).addTo(this.map);
 
-    // Street names + labels overlay (CartoDB light only labels)
-    this.labelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+    // Street names + labels overlay (CartoDB dark only labels — transparent bg, white text)
+    this.labelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
       maxZoom: 20,
       minZoom: 3,
       subdomains: 'abcd',
       noWrap: true,
       pane: 'overlayPane',
-      opacity: 0.85,
+      opacity: 0.9,
     }).addTo(this.map);
 
     // Create layers
@@ -159,14 +159,16 @@ class MapManager {
         <div class="item-marker ${item.type}" style="
           width:${cfg.size}px;height:${cfg.size}px;
           display:flex;align-items:center;justify-content:center;
-          font-size:${cfg.size - 6}px;
+          font-size:${cfg.size}px;
+          line-height:1;
+          font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji','Android Emoji',sans-serif;
           filter:drop-shadow(0 0 8px ${cfg.glow});
           animation:item-ping 3s ease-in-out infinite;
         ">${cfg.emoji}</div>
       `,
       className: '',
-      iconSize: [cfg.size + 8, cfg.size + 8],
-      iconAnchor: [(cfg.size + 8) / 2, (cfg.size + 8) / 2],
+      iconSize: [cfg.size + 10, cfg.size + 10],
+      iconAnchor: [(cfg.size + 10) / 2, (cfg.size + 10) / 2],
     });
 
     const marker = L.marker([item.latitude, item.longitude], {

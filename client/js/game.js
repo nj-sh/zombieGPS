@@ -59,6 +59,11 @@ class Game {
     document.getElementById('hud-fullscreen-btn')?.addEventListener('click', () => {
       this.toggleFullscreen();
     });
+
+    // Setup inventory bag toggle
+    document.getElementById('hud-inventory-bag')?.addEventListener('click', () => {
+      this.toggleInventory();
+    });
     document.addEventListener('fullscreenchange', () => this.updateFullscreenIcon());
     document.addEventListener('webkitfullscreenchange', () => this.updateFullscreenIcon());
 
@@ -153,6 +158,11 @@ class Game {
         window.hud.init();
         window.hud.show();
 
+        // Update player info now that HUD elements exist
+        if (this.player) {
+          window.hud.updatePlayerInfo(this.player);
+        }
+
         // Re-render HUD counts after init
         this.updateOnlineCount();
 
@@ -173,6 +183,12 @@ class Game {
       this.hideLoadingScreen();
       this.startSurvivalTimer();
       window.gps.startWatching();
+
+      // Initial reverse geocode
+      this.doReverseGeocode();
+
+      // Periodic reverse geocode every 30s
+      this._geocodeInterval = setInterval(() => this.doReverseGeocode(), 30000);
 
       console.log('☣ Entered outbreak!');
 
@@ -313,12 +329,19 @@ class Game {
     this.safeZones = data.safeZones || [];
     this.extractionPoints = data.extractionPoints || [];
 
+    // Setup player inventory if missing
+    this.player.inventory = this.player.inventory || [
+      { type: 'medicine', name: 'Medicine' },
+      { type: 'medicine', name: 'Medicine' },
+    ];
+
     if (window.playerRenderer) {
       window.playerRenderer.setLocalPlayerId(this.player.id);
     }
 
     window.hud.updatePlayerInfo(this.player);
     this.updateOnlineCount();
+    this.updateInventoryUI();
 
     // Update escape UI based on player state
     this.updateEscapeUI();
@@ -572,6 +595,7 @@ class Game {
    */
   handleEscapeSuccess(data) {
     this.state = 'escaped';
+    this.cleanupTimers();
 
     if (data.coins) {
       this.player.coins = (this.player.coins || 0) + data.coins;
@@ -619,6 +643,7 @@ class Game {
    */
   handleGameOver(data) {
     this.state = 'game_over';
+    this.cleanupTimers();
 
     // Show game over overlay
     const overlay = document.createElement('div');
@@ -684,10 +709,22 @@ class Game {
     window.hud.updateGPSInfo(data.accuracy, data.speed);
     window.hud.updateCompass(window.deviceOrientation.getHeading());
 
-    window.mapManager.centerOnPlayer(data.latitude, data.longitude);
+    window.mapManager.centerOnPlayer(data.latitude, data.longitude);      // Update direction line to nearest extraction point
+      window.mapManager.updateDirectionLine(data.latitude, data.longitude);
 
-    // Update direction line to nearest extraction point
-    window.mapManager.updateDirectionLine(data.latitude, data.longitude);
+      // Reverse geocode if moved significantly (>150m)
+      if (this._lastGeocodePos) {
+        const dist = this.calculateDistance(
+          this._lastGeocodePos.lat, this._lastGeocodePos.lng,
+          data.latitude, data.longitude
+        );
+        if (dist > 150) {
+          this._lastGeocodePos = { lat: data.latitude, lng: data.longitude };
+          this.doReverseGeocode();
+        }
+      } else {
+        this._lastGeocodePos = { lat: data.latitude, lng: data.longitude };
+      }
 
     const now = Date.now();
     const interval = this.isMoving ? this.positionUpdateInterval : this.idleUpdateInterval;
@@ -710,6 +747,42 @@ class Game {
     }
 
     this.survivalStartTime = this.survivalStartTime || Date.now();
+  }
+
+  /**
+   * Reverse geocode — use Nominatim to find the current city/place name.
+   */
+  async doReverseGeocode() {
+    // Rate limit: at most once every 5 seconds (Nominatim policy)
+    const now = Date.now();
+    if (this._lastGeocodeTime && now - this._lastGeocodeTime < 5000) return;
+
+    const gpsData = window.gps.getPositionData();
+    if (!gpsData) return;
+
+    const { latitude, longitude } = gpsData;
+    const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)}`;
+
+    // Throttle: don't re-request if position hasn't changed much (≈100m)
+    if (this._lastGeocodeKey === cacheKey) return;
+    this._lastGeocodeKey = cacheKey;
+    this._lastGeocodeTime = now;
+
+    try {
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&accept-language=en`,
+        { headers: { 'User-Agent': 'ZombieApocalypse/1.0' } }
+      );
+      if (!resp.ok) return;
+      const data = await resp.json();
+
+      let place = data.display_name || '';
+      // Shorten: take the first 3 parts of the address (e.g. "Street, District, City")
+      const parts = place.split(',').slice(0, 3).map(s => s.trim()).join(', ');
+      window.hud.updateLocation(parts || 'Unknown area');
+    } catch (err) {
+      console.warn('Geocode error:', err);
+    }
   }
 
   /**
@@ -828,6 +901,20 @@ class Game {
   }
 
   /**
+   * Clean up all running timers.
+   */
+  cleanupTimers() {
+    if (this.survivalInterval) {
+      clearInterval(this.survivalInterval);
+      this.survivalInterval = null;
+    }
+    if (this._geocodeInterval) {
+      clearInterval(this._geocodeInterval);
+      this._geocodeInterval = null;
+    }
+  }
+
+  /**
    * Start survival timer.
    */
   startSurvivalTimer() {
@@ -837,6 +924,27 @@ class Game {
         this.survivalTime = Math.floor((Date.now() - this.survivalStartTime) / 1000);
       }
     }, 1000);
+  }
+
+  /**
+   * Toggle inventory bag open/closed.
+   */
+  toggleInventory() {
+    const bar = document.getElementById('hud-inventory');
+    if (!bar) return;
+    const isOpen = bar.style.display !== 'none';
+    bar.style.display = isOpen ? 'none' : 'flex';
+    if (!isOpen) this.updateInventoryUI();
+  }
+
+  /**
+   * Refresh the inventory display from player data.
+   */
+  updateInventoryUI() {
+    if (!this.player) return;
+    const items = this.player.inventory || [];
+    window.hud.updateInventory(items);
+    window.hud.updateInventoryBag(items);
   }
 
   /**
