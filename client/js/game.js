@@ -135,6 +135,9 @@ class Game {
       await this.loadingStep('Loading World...', async () => {
         const gpsData = window.gps.getPositionData() || { latitude: 40.7128, longitude: -74.0060 };
         window.mapManager.init(gpsData.latitude, gpsData.longitude);
+
+        // Now the player renderer exists — render the local player + all known players
+        this.renderAllPlayersToMap();
       });
 
       // Step 6: Enter outbreak!
@@ -142,6 +145,9 @@ class Game {
         window.mapManager.show();
         window.hud.init();
         window.hud.show();
+
+        // Re-render HUD counts after init
+        this.updateOnlineCount();
 
         await window.deviceOrientation.requestPermission();
         window.deviceOrientation.start();
@@ -283,15 +289,19 @@ class Game {
     window.socketManager.on('safe_zone_left', (data) => this.handleSafeZoneLeft(data));
     window.socketManager.on('extraction_active', (data) => this.handleExtractionActive(data));
     window.socketManager.on('escape_success', (data) => this.handleEscapeSuccess(data));
+    window.socketManager.on('game_over', (data) => this.handleGameOver(data));
     window.socketManager.on('error', (data) => this.handleError(data));
   }
 
   /**
    * Handle initial game state from server.
+   * Note: playerRenderer doesn't exist yet when this runs (map init is Step 5).
+   * We store the data and render players later via renderAllPlayersToMap().
    */
   handleGameState(data) {
     this.player = data.player;
-    this.nearbyPlayers = data.players || [];
+    // Filter local player out — updateOnlineCount() always adds +1 for the local player
+    this.nearbyPlayers = (data.players || []).filter(p => p.id !== this.player?.id);
     this.gameItems = data.items || [];
     this.safeZones = data.safeZones || [];
     this.extractionPoints = data.extractionPoints || [];
@@ -301,32 +311,71 @@ class Game {
     }
 
     window.hud.updatePlayerInfo(this.player);
-    window.hud.updateGameStats({
-      online: data.players?.length || 0,
-      survivors: data.players?.filter(p => p.team === 'survivor')?.length || 0,
-      zombies: data.players?.filter(p => p.team === 'zombie')?.length || 0,
-    });
+    this.updateOnlineCount();
 
     // Update escape UI based on player state
     this.updateEscapeUI();
 
-    data.players?.forEach(p => {
-      if (window.playerRenderer) {
-        window.playerRenderer.updatePlayer(p);
-      }
+    // Store items/safe zones for when map is ready
+    this._pendingItems = data.items || [];
+    this._pendingSafeZones = data.safeZones || [];
+    this._pendingExtractionPoints = data.extractionPoints || [];
+
+    // If player renderer already exists (e.g., reconnection), render now
+    if (window.playerRenderer) {
+      window.playerRenderer.setLocalPlayerId(this.player.id);
+      this.renderAllPlayersToMap();
+    }
+  }
+
+  /**
+   * Render all known players on the map.
+   * Called after map/playerRenderer is initialized (Step 5).
+   */
+  renderAllPlayersToMap() {
+    if (!window.playerRenderer || !this.player) return;
+
+    window.playerRenderer.setLocalPlayerId(this.player.id);
+
+    // Render local player first
+    window.playerRenderer.updatePlayer(this.player);
+
+    // Render all other players
+    this.nearbyPlayers.forEach(p => {
+      window.playerRenderer.updatePlayer(p);
     });
 
-    data.items?.forEach(item => {
-      window.mapManager.addItemMarker(item);
-    });
+    // Render pending map items
+    if (this._pendingItems) {
+      this._pendingItems.forEach(item => {
+        if (!item.is_collected) window.mapManager.addItemMarker(item);
+      });
+      delete this._pendingItems;
+    }
 
-    data.safeZones?.forEach(zone => {
-      window.mapManager.addSafeZone(zone);
-    });
+    // Render pending safe zones
+    if (this._pendingSafeZones) {
+      this._pendingSafeZones.forEach(zone => window.mapManager.addSafeZone(zone));
+      delete this._pendingSafeZones;
+    }
 
-    // Render extraction points
-    data.extractionPoints?.forEach(ep => {
-      window.mapManager.addExtractionPoint(ep);
+    // Render pending extraction points
+    if (this._pendingExtractionPoints) {
+      this._pendingExtractionPoints.forEach(ep => window.mapManager.addExtractionPoint(ep));
+      delete this._pendingExtractionPoints;
+    }
+  }
+
+  /**
+   * Update the HUD online player count, always including the local player.
+   */
+  updateOnlineCount() {
+    if (!this.player) return;
+    const totalOnline = this.nearbyPlayers.length + 1;
+    window.hud.updateGameStats({
+      online: totalOnline,
+      survivors: this.nearbyPlayers.filter(p => p.team === 'survivor').length + (this.player.team === 'survivor' ? 1 : 0),
+      zombies: this.nearbyPlayers.filter(p => p.team === 'zombie').length + (this.player.team === 'zombie' ? 1 : 0),
     });
   }
 
@@ -451,11 +500,7 @@ class Game {
    */
   handleNearbyPlayers(data) {
     this.nearbyPlayers = data.players || [];
-    window.hud.updateGameStats({
-      online: this.nearbyPlayers.length + 1,
-      survivors: this.nearbyPlayers.filter(p => p.team === 'survivor').length + (this.player?.team === 'survivor' ? 1 : 0),
-      zombies: this.nearbyPlayers.filter(p => p.team === 'zombie').length + (this.player?.team === 'zombie' ? 1 : 0),
-    });
+    this.updateOnlineCount();
 
     // Update extraction points from nearby data
     if (data.extractionPoints) {
@@ -563,6 +608,57 @@ class Game {
   }
 
   /**
+   * Handle game over (zombie win).
+   */
+  handleGameOver(data) {
+    this.state = 'game_over';
+
+    // Show game over overlay
+    const overlay = document.createElement('div');
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.92);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+      animation: fade-in 0.5s ease;
+      font-family: 'Cinzel', serif;
+    `;
+    overlay.innerHTML = `
+      <div style="font-size:4rem;margin-bottom:10px;">🧟☠</div>
+      <div style="font-size:2.2rem;color:var(--blood-red);text-shadow:0 0 30px rgba(193,18,31,0.6);margin-bottom:10px;letter-spacing:0.1em;">
+        OUTBREAK WINNERS
+      </div>
+      <div style="font-family:'Poppins',sans-serif;font-size:1.2rem;color:var(--blood-red);margin-bottom:20px;opacity:0.9;">
+        ${data.message || 'All survivors have been infected! The zombies win!'}
+      </div>
+      <div style="font-family:'Poppins',sans-serif;font-size:0.9rem;color:rgba(255,255,255,0.5);margin-bottom:30px;">
+        New supplies are being dropped. The hunt begins again...
+      </div>
+      <button onclick="location.reload()" style="padding:12px 40px;background:var(--blood-red);border:none;border-radius:8px;color:white;font-size:1rem;cursor:pointer;font-family:'Poppins',sans-serif;font-weight:600;letter-spacing:0.05em;box-shadow:0 0 15px rgba(193,18,31,0.4);transition:transform 0.2s;"
+        onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'"
+      >
+        PLAY AGAIN
+      </button>
+    `;
+    document.body.appendChild(overlay);
+
+    // Play zombie win sound
+    if (window.audio) {
+      window.audio.playNotification();
+    }
+
+    // Clear survival timer
+    if (this.survivalInterval) {
+      clearInterval(this.survivalInterval);
+    }
+  }
+
+  /**
    * Handle error.
    */
   handleError(data) {
@@ -582,6 +678,9 @@ class Game {
     window.hud.updateCompass(window.deviceOrientation.getHeading());
 
     window.mapManager.centerOnPlayer(data.latitude, data.longitude);
+
+    // Update direction line to nearest extraction point
+    window.mapManager.updateDirectionLine(data.latitude, data.longitude);
 
     const now = Date.now();
     const interval = this.isMoving ? this.positionUpdateInterval : this.idleUpdateInterval;

@@ -242,6 +242,31 @@ export function setupSocketHandlers(io) {
                 socket.join(`team:${TEAMS.ZOMBIE}`);
 
                 console.log(`🧟 ${player.name} was infected by ${otherPlayer.name}!`);
+
+                // ── Zombie Win Condition Check ──
+                const activeSurvivors = Array.from(activePlayers.values()).filter(
+                  p => p.team === TEAMS.SURVIVOR && p.status === PLAYER_STATUS.ACTIVE
+                );
+                if (activeSurvivors.length === 0) {
+                  console.log('🧟☠ ALL SURVIVORS INFECTED! ZOMBIES WIN!');
+                  
+                  io.emit(SOCKET_EVENTS.GAME_OVER, {
+                    winner: TEAMS.ZOMBIE,
+                    message: 'All survivors have been infected! The zombies win! ☠',
+                    survivorsInfected: true,
+                  });
+
+                  // Clear existing extraction points
+                  extractionPoints = [];
+
+                  // Respawn new items after a short delay
+                  setTimeout(() => {
+                    gameItems = spawnItems();
+                    io.emit(SOCKET_EVENTS.ITEM_SPAWNED, { items: gameItems });
+                    console.log('🔄 New round items spawned!');
+                  }, 5000);
+                }
+
                 break;
               }
             }

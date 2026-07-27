@@ -48,7 +48,7 @@ class GPSTracker {
 
       this.permissionGranted = true;
       this.updatePosition(position);
-      this.startWatching();
+      // Don't startWatching here — caller calls it once after full init to avoid double prompts
 
       return {
         latitude: position.coords.latitude,

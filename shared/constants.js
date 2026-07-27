@@ -84,4 +84,5 @@ export const SOCKET_EVENTS = {
   ESCAPE_SUCCESS: 'escape_success',
   ERROR: 'error',
   NEARBY_PLAYERS: 'nearby_players',
+  GAME_OVER: 'game_over',
 };

@@ -43,11 +43,11 @@ class MapManager {
       markerZoomAnimation: true,
     });
 
-    // Dark tile layer
-    this.tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Satellite tile layer (Esri World Imagery)
+    this.tileLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
       minZoom: 3,
-      subdomains: 'abcd',
+      attribution: '&copy; Esri, Maxar, Earthstar Geographics',
       noWrap: true,
     }).addTo(this.map);
 
@@ -123,31 +123,38 @@ class MapManager {
   }
 
   /**
-   * Add an item marker to the map.
+   * Add an item marker to the map (with emoji icons).
    */
   addItemMarker(item) {
     if (!this.map) return;
 
-    // Color based on type
-    const colors = {
-      mech_part: '#ffd700',
-      health_pack: '#00cc00',
-      ammo: '#ff8800',
-      food: '#8B4513',
-      medicine: '#00aaff',
-      energy_drink: '#00ffee',
-      armor: '#888888',
-      keys: '#c0c0c0',
+    // Emoji + glow per type
+    const icons = {
+      mech_part: { emoji: '⚙️', size: 28, glow: '#ffd700' },
+      health_pack: { emoji: '❤️', size: 24, glow: '#00cc00' },
+      ammo: { emoji: '🔫', size: 24, glow: '#ff8800' },
+      food: { emoji: '🍖', size: 24, glow: '#8B4513' },
+      medicine: { emoji: '💊', size: 24, glow: '#00aaff' },
+      energy_drink: { emoji: '⚡', size: 24, glow: '#00ffee' },
+      armor: { emoji: '🛡️', size: 24, glow: '#888888' },
+      keys: { emoji: '🔑', size: 24, glow: '#c0c0c0' },
     };
 
-    const color = colors[item.type] || '#ffffff';
-    const size = item.type === 'mech_part' ? 20 : 16;
+    const cfg = icons[item.type] || { emoji: '📦', size: 24, glow: '#ffffff' };
 
     const icon = L.divIcon({
-      html: `<div class="item-marker ${item.type}" style="width:${size}px;height:${size}px;background:radial-gradient(circle at 35% 35%, ${color}, #333);box-shadow:0 0 ${size/2}px ${color}44;border-radius:50%;"></div>`,
+      html: `
+        <div class="item-marker ${item.type}" style="
+          width:${cfg.size}px;height:${cfg.size}px;
+          display:flex;align-items:center;justify-content:center;
+          font-size:${cfg.size - 6}px;
+          filter:drop-shadow(0 0 8px ${cfg.glow});
+          animation:item-ping 3s ease-in-out infinite;
+        ">${cfg.emoji}</div>
+      `,
       className: '',
-      iconSize: [size + 4, size + 4],
-      iconAnchor: [(size + 4) / 2, (size + 4) / 2],
+      iconSize: [cfg.size + 8, cfg.size + 8],
+      iconAnchor: [(cfg.size + 8) / 2, (cfg.size + 8) / 2],
     });
 
     const marker = L.marker([item.latitude, item.longitude], {
@@ -302,6 +309,63 @@ class MapManager {
       this.extractionPointLayer.clearLayers();
     }
     this.extractionPointMarkers.clear();
+    this.removeDirectionLine();
+  }
+
+  /**
+   * Direction line — a dotted line from the player to the nearest extraction point.
+   */
+  directionLine = null;
+
+  /**
+   * Draw (or update) a direction line from the player to the nearest extraction point.
+   */
+  updateDirectionLine(playerLat, playerLng) {
+    if (!this.map || this.extractionPointMarkers.size === 0) {
+      this.removeDirectionLine();
+      return;
+    }
+
+    // Find nearest active extraction point
+    let nearest = null;
+    let nearestDist = Infinity;
+    this.extractionPointMarkers.forEach((data, id) => {
+      const marker = data.marker;
+      if (!marker) return;
+      const ll = marker.getLatLng();
+      const d = this.map.distance([playerLat, playerLng], ll);
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearest = ll;
+      }
+    });
+
+    if (!nearest) {
+      this.removeDirectionLine();
+      return;
+    }
+
+    if (this.directionLine) {
+      this.directionLine.setLatLngs([[playerLat, playerLng], nearest]);
+    } else {
+      this.directionLine = L.polyline([[playerLat, playerLng], nearest], {
+        color: '#39ff14',
+        weight: 2,
+        opacity: 0.6,
+        dashArray: '8, 10',
+        interactive: false,
+      }).addTo(this.map);
+    }
+  }
+
+  /**
+   * Remove the direction line.
+   */
+  removeDirectionLine() {
+    if (this.directionLine) {
+      this.map.removeLayer(this.directionLine);
+      this.directionLine = null;
+    }
   }
 
   /**

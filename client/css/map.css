@@ -13,9 +13,9 @@
   opacity: 1;
 }
 
-/* ── Dark Map Tiles ── */
+/* ── Satellite tiles overlay darkening ── */
 .leaflet-tile-pane {
-  filter: brightness(0.6) invert(1) hue-rotate(180deg) saturate(0.5);
+  filter: brightness(0.85) saturate(1.1) contrast(1.1);
 }
 
 /* ── Remove Leaflet default UI ── */
@@ -113,32 +113,13 @@
   box-shadow: 0 0 20px rgba(193, 18, 31, 0.6), 0 0 40px rgba(193, 18, 31, 0.2);
 }
 
-/* ── Item Markers ── */
+/* ── Item Markers (emoji) ── */
 .item-marker {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  animation: item-ping 3s ease-in-out infinite;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-shadow: 0 0 6px rgba(0,0,0,0.8);
 }
-
-.item-marker.mech-part {
-  background: radial-gradient(circle at 35% 35%, #ffe44d, var(--item-gold));
-  box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
-  width: 20px;
-  height: 20px;
-}
-
-.item-marker.health-pack {
-  background: radial-gradient(circle at 35% 35%, #5fff5f, #00cc00);
-  box-shadow: 0 0 8px rgba(0, 255, 0, 0.4);
-}
-
-.item-marker.ammo { background: #ff8800; }
-.item-marker.food { background: #8B4513; }
-.item-marker.medicine { background: #00aaff; }
-.item-marker.energy-drink { background: #00ffee; }
-.item-marker.armor { background: #888888; }
-.item-marker.keys { background: #c0c0c0; }
 
 /* ── Safe Zone Marker ── */
 .safe-zone-marker {
