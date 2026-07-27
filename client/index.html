@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a0a0a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="Zombie Apocalypse - Real-world GPS multiplayer survival game">
+
+  <title>ZOMBIE APOCALYPSE</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Socket.IO -->
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="/css/main.css">
+  <link rel="stylesheet" href="/css/animations.css">
+  <link rel="stylesheet" href="/css/menu.css">
+  <link rel="stylesheet" href="/css/hud.css">
+  <link rel="stylesheet" href="/css/map.css">
+
+  <!-- PWA -->
+  <link rel="manifest" href="/manifest.json">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+</head>
+<body>
+  <!-- ════════════════════════════════════════════════════════
+       GAME CONTAINER
+       ════════════════════════════════════════════════════════ -->
+  <div id="game-container">
+
+    <!-- ── MAP ── -->
+    <div id="map"></div>
+
+    <!-- ── ZOMBIE VISION OVERLAY ── -->
+    <div id="zombie-vision"></div>
+
+    <!-- ── INFECTION FLASH ── -->
+    <div id="infection-flash"></div>
+
+    <!-- ════════════════════════════════════════════════════════
+         MAIN MENU
+         ════════════════════════════════════════════════════════ -->
+    <div id="menu-screen">
+      <!-- Fog overlays -->
+      <div class="menu-fog"></div>
+      <div class="menu-fog-2"></div>
+      <div class="menu-glow"></div>
+
+      <!-- Blood particles -->
+      <div id="blood-particles"></div>
+
+      <!-- Menu content -->
+      <div class="menu-content">
+        <!-- Logo -->
+        <div class="menu-logo">
+          <span class="zombie">ZOMBIE</span>
+          <span class="apocalypse">APOCALYPSE</span>
+        </div>
+
+        <div class="menu-subtitle">"Survive... or Become the Hunter."</div>
+
+        <!-- Form -->
+        <div class="menu-form">
+          <input
+            type="text"
+            id="player-name-input"
+            class="menu-input"
+            placeholder="Enter your callsign..."
+            maxlength="16"
+            autocomplete="off"
+            spellcheck="false"
+          >
+
+          <div class="team-select">
+            <button class="team-option selected-survivor" data-team="survivor">
+              <span class="team-icon">🧑</span>
+              SURVIVOR
+            </button>
+            <button class="team-option" data-team="zombie">
+              <span class="team-icon">🧟</span>
+              ZOMBIE
+            </button>
+          </div>
+
+          <button id="enter-btn" class="menu-enter-btn" disabled>
+            ENTER OUTBREAK
+          </button>
+        </div>
+      </div>
+
+      <div class="menu-footer">☣ REAL-WORLD GPS MULTIPLAYER ☣</div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════
+         LOADING SCREEN
+         ════════════════════════════════════════════════════════ -->
+    <div id="loading-screen">
+      <div class="loading-biohazard">
+        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Biohazard symbol (simplified) -->
+          <circle cx="50" cy="50" r="8" fill="#c1121f"/>
+          <path d="M50 42 C50 42, 58 30, 70 28 C80 26, 85 32, 85 32"
+                stroke="#c1121f" stroke-width="3" fill="none"/>
+          <path d="M50 42 C50 42, 30 30, 30 28 C20 26, 15 32, 15 32"
+                stroke="#c1121f" stroke-width="3" fill="none"/>
+          <path d="M50 58 C50 58, 42 70, 30 72 C20 74, 15 68, 15 68"
+                stroke="#c1121f" stroke-width="3" fill="none"/>
+          <path d="M50 58 C50 58, 58 70, 70 72 C80 74, 85 68, 85 68"
+                stroke="#c1121f" stroke-width="3" fill="none"/>
+        </svg>
+      </div>
+
+      <div class="loading-lines">
+        <div class="loading-line" data-default-text="Initializing Engine...">
+          <span class="loading-icon">☣</span>
+          <span class="loading-text">Initializing Engine...</span>
+        </div>
+        <div class="loading-line" data-default-text="Requesting GPS Permission...">
+          <span class="loading-icon">📍</span>
+          <span class="loading-text">Requesting GPS Permission...</span>
+        </div>
+        <div class="loading-line" data-default-text="Connecting to Server...">
+          <span class="loading-icon">🔌</span>
+          <span class="loading-text">Connecting to Server...</span>
+        </div>
+        <div class="loading-line" data-default-text="Downloading Survivor Data...">
+          <span class="loading-icon">💾</span>
+          <span class="loading-text">Downloading Survivor Data...</span>
+        </div>
+        <div class="loading-line" data-default-text="Loading World...">
+          <span class="loading-icon">🗺️</span>
+          <span class="loading-text">Loading World...</span>
+        </div>
+        <div class="loading-line" data-default-text="Entering Outbreak...">
+          <span class="loading-icon">☣</span>
+          <span class="loading-text">Entering Outbreak...</span>
+        </div>
+      </div>
+
+      <div class="loading-progress-container">
+        <div class="loading-progress-fill" id="loading-progress-fill"></div>
+      </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════
+         HUD (Heads-Up Display)
+         ════════════════════════════════════════════════════════ -->
+    <div id="hud">
+
+      <!-- Top Left: Player Info -->
+      <div class="hud-top-left">
+        <div class="hud-player-name">
+          <span class="hud-team-dot survivor" id="hud-team-dot"></span>
+          <span id="hud-player-name">Unknown</span>
+        </div>
+        <div class="hud-health-bar">
+          <div class="hud-health-fill high" id="hud-health-fill" style="width:100%"></div>
+        </div>
+        <div class="hud-health-text" id="hud-health-text">100%</div>
+        <div class="hud-mech-parts" id="hud-mech-parts">
+          <div class="hud-mech-slot"></div>
+          <div class="hud-mech-slot"></div>
+          <div class="hud-mech-slot"></div>
+        </div>
+      </div>
+
+      <!-- Settings Button -->
+      <button class="hud-settings-btn" id="settings-btn">⚙</button>
+
+      <!-- Top Right: Game Stats -->
+      <div class="hud-top-right">
+        <div class="hud-stat">Online: <span class="value" id="hud-online">0</span></div>
+        <div class="hud-stat">Survivors: <span class="value survivor-count" id="hud-survivors">0</span></div>
+        <div class="hud-stat">Zombies: <span class="value zombie-count" id="hud-zombies">0</span></div>
+      </div>
+
+      <!-- Bottom Left: GPS Info -->
+      <div class="hud-bottom-left">
+        <div class="hud-gps-info" id="hud-gps-accuracy">GPS: ±--</div>
+        <div class="hud-gps-info" id="hud-gps-speed">Speed: --</div>
+      </div>
+
+      <!-- Bottom Right: Compass -->
+      <div class="hud-bottom-right">
+        <div class="hud-compass">
+          <div class="hud-compass-label">N</div>
+          <div class="hud-compass-needle" id="hud-compass-needle"></div>
+          <div class="hud-compass-ring"></div>
+        </div>
+        <button
+          style="width:36px;height:36px;background:rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.15);border-radius:50%;color:white;font-size:0.9rem;cursor:pointer;pointer-events:auto;display:flex;align-items:center;justify-content:center;"
+          onclick="document.documentElement.requestFullscreen?.()"
+          title="Fullscreen"
+        >⛶</button>
+      </div>
+
+      <!-- Center Bottom: Hearts & Stamina -->
+      <div class="hud-center-bottom">
+        <div class="hud-hearts" id="hud-hearts">
+          <span class="hud-heart">❤</span>
+          <span class="hud-heart">❤</span>
+          <span class="hud-heart">❤</span>
+        </div>
+        <div class="hud-stamina-bar">
+          <div class="hud-stamina-fill" id="hud-stamina-fill" style="width:100%"></div>
+        </div>
+      </div>
+
+      <!-- Escape Panel (survivors only) -->
+      <div id="hud-escape-panel" style="
+        position: absolute;
+        top: 100px;
+        left: 50%;
+        transform: translateX(-50%);
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        gap: 6px;
+        pointer-events: auto;
+        background: rgba(0,0,0,0.7);
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid rgba(255,255,255,0.1);
+      ">
+        <div id="hud-escape-status" style="font-size:0.7rem;color:rgba(255,255,255,0.5);letter-spacing:0.05em;">
+          ⚙️ Collect mech parts (0/3)
+        </div>
+        <button id="hud-craft-radio" style="
+          display: none;
+          padding: 8px 20px;
+          background: linear-gradient(135deg, var(--item-gold), #b8860b);
+          border: none;
+          border-radius: 6px;
+          color: black;
+          font-family: 'Poppins', sans-serif;
+          font-size: 0.8rem;
+          font-weight: 700;
+          cursor: pointer;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          box-shadow: 0 0 10px rgba(255,215,0,0.3);
+        ">📻 CRAFT RADIO</button>
+        <button id="hud-escape-btn" style="
+          display: none;
+          padding: 8px 20px;
+          background: linear-gradient(135deg, var(--neon-green), #007700);
+          border: none;
+          border-radius: 6px;
+          color: white;
+          font-family: 'Poppins', sans-serif;
+          font-size: 0.8rem;
+          font-weight: 700;
+          cursor: pointer;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          box-shadow: 0 0 10px rgba(57,255,20,0.3);
+        ">🚁 ESCAPE</button>
+      </div>
+
+      <!-- Inventory -->
+      <div class="hud-inventory" id="hud-inventory">
+        <div class="hud-inventory-slot"></div>
+        <div class="hud-inventory-slot"></div>
+        <div class="hud-inventory-slot"></div>
+        <div class="hud-inventory-slot"></div>
+        <div class="hud-inventory-slot"></div>
+        <div class="hud-inventory-slot"></div>
+        <div class="hud-inventory-slot"></div>
+        <div class="hud-inventory-slot"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       SCRIPTS (loaded in dependency order with defer)
+       ════════════════════════════════════════════════════════ -->
+
+  <!-- Utilities (no dependencies) -->
+  <script defer src="/js/utils.js"></script>
+
+  <!-- Core modules (may reference utils.js) -->
+  <script defer src="/js/audio.js"></script>
+  <script defer src="/js/gps.js"></script>
+  <script defer src="/js/orientation.js"></script>
+  <script defer src="/js/particles.js"></script>
+  <script defer src="/js/player.js"></script>
+  <script defer src="/js/notifications.js"></script>
+
+  <!-- Mid-level modules (reference core modules) -->
+  <script defer src="/js/socket.js"></script>
+  <script defer src="/js/pwa.js"></script>
+  <script defer src="/js/hud.js"></script>
+  <script defer src="/js/menu.js"></script>
+
+  <!-- High-level modules (reference everything) -->
+  <script defer src="/js/settings.js"></script>
+  <script defer src="/js/map.js"></script>
+
+  <!-- Game controller (loaded last) -->
+  <script defer src="/js/game.js"></script>
+</body>
+</html>

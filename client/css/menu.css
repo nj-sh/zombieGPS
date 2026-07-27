@@ -1,0 +1,257 @@
+/* Zombie Apocalypse - Main Menu Styles */
+
+#menu-screen {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, var(--dark-gray) 0%, var(--black) 70%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+/* ── Fog Overlay ── */
+.menu-fog {
+  position: absolute;
+  top: 0; left: 0;
+  width: 200%; height: 100%;
+  background: 
+    radial-gradient(ellipse at 20% 50%, rgba(193, 18, 31, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 50%, rgba(193, 18, 31, 0.05) 0%, transparent 50%);
+  animation: fog-drift 20s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.menu-fog-2 {
+  position: absolute;
+  top: 0; left: -100%;
+  width: 200%; height: 100%;
+  background: 
+    radial-gradient(ellipse at 50% 30%, rgba(193, 18, 31, 0.06) 0%, transparent 60%);
+  animation: fog-drift 25s ease-in-out infinite 5s;
+  pointer-events: none;
+}
+
+/* ── Red Glow Overlay ── */
+.menu-glow {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 600px; height: 600px;
+  background: radial-gradient(circle, rgba(193, 18, 31, 0.15) 0%, transparent 70%);
+  animation: glow-pulse 4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* ── Blood Particles Container ── */
+#blood-particles {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.blood-particle {
+  position: absolute;
+  width: 4px; height: 4px;
+  background: var(--blood-red);
+  border-radius: 50%;
+  opacity: 0;
+  animation: blood-rain linear infinite;
+  filter: blur(1px);
+}
+
+/* ── Menu Content ── */
+.menu-content {
+  position: relative;
+  z-index: 10;
+  text-align: center;
+  max-width: 500px;
+  padding: 40px 20px;
+  animation: fade-in 1.5s ease;
+}
+
+/* ── Logo ── */
+.menu-logo {
+  font-family: var(--font-title);
+  font-size: clamp(2rem, 8vw, 4.5rem);
+  font-weight: 900;
+  color: var(--white);
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  line-height: 1.1;
+  animation: text-glow-pulse 3s ease-in-out infinite;
+}
+
+.menu-logo .zombie {
+  color: var(--blood-red);
+}
+
+.menu-logo .apocalypse {
+  display: block;
+  font-size: 0.5em;
+  letter-spacing: 0.3em;
+  color: var(--white);
+  opacity: 0.7;
+  margin-top: -5px;
+}
+
+/* ── Subtitle ── */
+.menu-subtitle {
+  font-family: var(--font-ui);
+  font-size: clamp(0.8rem, 2vw, 1.1rem);
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.15em;
+  margin-top: 15px;
+  font-style: italic;
+}
+
+/* ── Form ── */
+.menu-form {
+  margin-top: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  align-items: center;
+}
+
+.menu-input {
+  width: 100%;
+  max-width: 320px;
+  padding: 14px 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: var(--white);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  text-align: center;
+  transition: all var(--transition-normal);
+  letter-spacing: 0.05em;
+}
+
+.menu-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.menu-input:focus {
+  border-color: var(--blood-red);
+  background: rgba(193, 18, 31, 0.05);
+  box-shadow: var(--glow-red);
+  outline: none;
+}
+
+/* ── Team Selection ── */
+.team-select {
+  display: flex;
+  gap: 15px;
+  width: 100%;
+  max-width: 320px;
+}
+
+.team-option {
+  flex: 1;
+  padding: 12px 16px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--white);
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.team-option:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.team-option.selected-survivor {
+  border-color: var(--neon-green);
+  background: rgba(57, 255, 20, 0.1);
+  box-shadow: var(--glow-green);
+}
+
+.team-option.selected-zombie {
+  border-color: var(--blood-red);
+  background: rgba(193, 18, 31, 0.1);
+  box-shadow: var(--glow-red);
+}
+
+.team-option .team-icon {
+  display: block;
+  font-size: 1.5rem;
+  margin-bottom: 5px;
+}
+
+/* ── Enter Button ── */
+.menu-enter-btn {
+  position: relative;
+  padding: 16px 48px;
+  background: linear-gradient(135deg, var(--blood-red) 0%, #8a0f0f 100%);
+  border: none;
+  border-radius: 8px;
+  color: var(--white);
+  font-family: var(--font-title);
+  font-size: clamp(1rem, 3vw, 1.3rem);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  box-shadow: 0 0 15px rgba(193, 18, 31, 0.3);
+  overflow: hidden;
+}
+
+.menu-enter-btn::before {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.05) 50%,
+    transparent 70%
+  );
+  animation: shine 3s ease-in-out infinite;
+}
+
+@keyframes shine {
+  0% { transform: translateX(-100%) rotate(45deg); }
+  100% { transform: translateX(100%) rotate(45deg); }
+}
+
+.menu-enter-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 25px rgba(193, 18, 31, 0.6), 0 5px 20px rgba(0, 0, 0, 0.3);
+}
+
+.menu-enter-btn:active {
+  transform: translateY(0);
+}
+
+.menu-enter-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* ── Bottom Text ── */
+.menu-footer {
+  position: absolute;
+  bottom: 20px;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.2);
+  letter-spacing: 0.1em;
+  z-index: 10;
+}

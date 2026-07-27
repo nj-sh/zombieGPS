@@ -1,0 +1,74 @@
+== Zombie Apocalypse - Project Status ==
+
+=== What's Been Built (Phase 1 + Phase 2) ===
+
+### Project Infrastructure
+- Project structure with client/, server/, shared/ directories
+- Express + Socket.IO server on port 3000
+- In-memory database (Supabase-ready)
+- Shared constants file for game config and socket events
+- .env.example for configuration
+
+### Frontend (Client)
+- Cinematic main menu: fog overlays, blood particles, glowing logo, team selection
+- Loading screen: animated 6-step sequence with progress bar, biohazard icon
+- Leaflet map: dark CartoDB tiles, custom circular player icons
+- Player rendering: circle + direction arrow + name + health ring
+- HUD: health bar, compass, player counts, GPS accuracy/speed, hearts, stamina
+- Sound system: Web Audio API (heartbeat, infection, item pickup, etc.)
+- Device orientation: compass tracking (phone heading)
+- Settings panel: audio sliders, render distance, quality, fullscreen
+- PWA support: manifest, service worker, install prompt
+- Notification system: toast-style alerts
+
+### Game Mechanics (Server)
+- Player system: join, position updates, persistent connection
+- Infection logic: 15m radius, server-authoritative distance calculation
+- Safe zones: entry/exit detection, health regen (2HP/2sec)
+- Item system: mech parts (3 required), health packs, supplies
+- Item pinging: items flash location every 5 minutes
+- Radio crafting: 3 mech parts → craft radio → spawn extraction point
+- Helicopter extraction: walk to extraction point, max 4 escape, 100 coins reward
+- Zombie vision: red pulse overlay + heartbeat within 50m of survivor
+- Anti-cheat: speed limit (30 km/h), teleport detection
+
+### Files Created
+- server/: index.js, config.js, supabase.js, game-logic.js, socket-handlers.js, items-spawner.js, utils.js, schema.sql
+- client/: index.html, manifest.json, sw.js
+- client/css/: main.css, animations.css, menu.css, hud.css, map.css
+- client/js/: game.js, menu.js, map.js, player.js, hud.js, audio.js, gps.js, socket.js, orientation.js, notifications.js, particles.js, settings.js, pwa.js, utils.js
+- client/icons/: icon-192.png, icon-512.png
+- shared/: constants.js
+- root: package.json, .gitignore, .env.example, zombie-apocalypse-spec.md
+
+=== Where to Start Next ===
+
+The server is running at http://localhost:3000. To start:
+  cd /root/Zgps && npm start
+
+=== Next Steps (Suggested Order) ===
+
+### Phase 3 - Victory Conditions & Polish
+1. Zombie win condition: when all survivors are infected, show zombie victory screen and respawn new mech parts for new round
+2. Background music + ambient zombie sounds (Web Audio or free sound files)
+3. Leaderboard UI (top survivors, top zombies, longest survival, most infections)
+
+### Phase 4 - Progression & Social
+4. Coin economy: shop for health/armor upgrades
+5. Player stats tracking: distance walked, infections caused, time survived
+6. Chat system (team + proximity)
+7. Vehicle support: real-world GPS speed detection
+
+### Phase 5 - Production Readiness
+8. Connect Supabase (PostgreSQL) for persistent storage
+9. Deploy to Railway/Render
+10. Performance optimization for 5000+ players
+11. Full PWA testing on Android + iPhone
+
+### Known Issues / TODOs
+- No zombie win condition (game never ends if survivors keep evading)
+- No background music yet
+- No leaderboard UI
+- No player stats persistence
+- Interval cleanup on server shutdown (healingInterval, itemPingInterval)
+- Some sounds use Web Audio synthesis rather than real audio files

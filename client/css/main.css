@@ -1,0 +1,77 @@
+/* Zombie Apocalypse - Main Styles */
+:root {
+  --black: #0a0a0a;
+  --blood-red: #c1121f;
+  --dark-gray: #1a1a1a;
+  --white: #ffffff;
+  --neon-green: #39ff14;
+  --survivor: #39ff14;
+  --zombie: #c1121f;
+  --safe-zone: #00aaff;
+  --item-gold: #ffd700;
+  --font-title: 'Cinzel', serif;
+  --font-ui: 'Poppins', sans-serif;
+  --transition-fast: 0.2s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+  --glow-red: 0 0 10px rgba(193, 18, 31, 0.5), 0 0 20px rgba(193, 18, 31, 0.3);
+  --glow-green: 0 0 10px rgba(57, 255, 20, 0.5), 0 0 20px rgba(57, 255, 20, 0.3);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--black);
+  color: var(--white);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+#game-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#game-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--black);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--blood-red);
+  border-radius: 3px;
+}
+
+/* Focus styles */
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--blood-red);
+  outline-offset: 2px;
+}
+
+/* Loading screen for slow connections */
+.loading-asset {
+  opacity: 0;
+  position: absolute;
+  pointer-events: none;
+}

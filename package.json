@@ -1,0 +1,18 @@
+{
+  "name": "zombie-apocalypse",
+  "version": "1.0.0",
+  "description": "Real-world GPS multiplayer zombie survival web game",
+  "main": "server/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "socket.io": "^4.7.5",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5"
+  }
+}
