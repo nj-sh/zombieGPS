@@ -175,23 +175,9 @@ class GPSTracker {
           // ── Update signal quality ──
           this.updateSignalQuality(accuracy);
 
-          // ── Process the position (filter + notify) ──
-          // handlePosition returns true if the position was accepted (not filtered)
-          const accepted = this.handlePosition(position);
-
-          if (accepted && bestPosition) {
-            // Update best position if accuracy improved
-            if (accuracy < bestPosition.accuracy) {
-              bestPosition = {
-                latitude: position.coords.latitude,
-                longitude: position.coords.longitude,
-                accuracy: accuracy,
-                speed: position.coords.speed,
-                heading: position.coords.heading,
-              };
-            }
-          } else if (accepted && !bestPosition) {
-            // First accepted position
+          // ── Track best accuracy from RAW data (unaffected by jitter filter) ──
+          // This ensures the timeout fallback always uses the best coordinates seen
+          if (!bestPosition || accuracy < bestPosition.accuracy) {
             bestPosition = {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
@@ -200,6 +186,10 @@ class GPSTracker {
               heading: position.coords.heading,
             };
           }
+
+          // ── Process the position (filter + notify) ──
+          // handlePosition returns true if the position was accepted (not filtered)
+          const accepted = this.handlePosition(position);
 
           // ── Notify with the raw data so UI can show live accuracy ──
           this.notifyListeners('acquisition_update', {
@@ -427,7 +417,8 @@ class GPSTracker {
     this.setCurrentPosition(smoothedPosition);
 
     // Calculate speed from position change (more reliable than GPS-reported speed)
-    const timeDiff = (timestamp - (this.currentPosition?.timestamp || timestamp)) / 1000;
+    // Use lastPosition.timestamp which was saved BEFORE setCurrentPosition overwrote it
+    const timeDiff = (timestamp - (this.lastPosition?.timestamp || timestamp)) / 1000;
     if (timeDiff > 0) {
       const calculatedSpeed = dist / timeDiff;
       this.speed = calculatedSpeed;

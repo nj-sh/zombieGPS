@@ -93,6 +93,9 @@ class Game {
         this.handlePositionUpdate(data);
       });
 
+      // Store acquisition listener reference for cleanup on retry
+      this._onAcquisitionUpdate = null;
+
       // Step 2: Acquire position — continuous watchPosition with accuracy improvement
       let gpsPos;
       let locationSource = 'gps';
@@ -104,7 +107,8 @@ class Game {
             // applies jitter filtering, and resolves when ready.
 
             // Listen for live accuracy updates during acquisition
-            const onAcquisitionUpdate = (data) => {
+            // Store reference so we can clean it up on retry
+            this._onAcquisitionUpdate = (data) => {
               if (data.accuracy) {
                 // Update the loading line text to show live accuracy
                 const lines = document.querySelectorAll('.loading-line');
@@ -121,27 +125,22 @@ class Game {
               }
             };
 
-            window.gps.on('acquisition_update', onAcquisitionUpdate);
+            window.gps.on('acquisition_update', this._onAcquisitionUpdate);
 
             try {
               const pos = await window.gps.acquirePosition();
               // GPS success! Clean up the acquisition listener
-              window.gps.off('acquisition_update', onAcquisitionUpdate);
+              window.gps.off('acquisition_update', this._onAcquisitionUpdate);
+              this._onAcquisitionUpdate = null;
               return pos;
             } catch (gpsErr) {
-              window.gps.off('acquisition_update', onAcquisitionUpdate);
+              window.gps.off('acquisition_update', this._onAcquisitionUpdate);
+              this._onAcquisitionUpdate = null;
 
               // Handle specific GPS errors with clear messages
-              if (gpsErr.code === 'GPS_DENIED') {
-                // Permission denied — try IP fallback instead of erroring
-                console.log('📍 GPS permission denied, trying IP geolocation...');
+              if (gpsErr.code === 'GPS_DENIED' || gpsErr.code === 'GPS_TIMEOUT' || gpsErr.code === 'GPS_UNAVAILABLE') {
+                console.log(`📍 GPS ${gpsErr.code}, trying IP geolocation...`);
                 // Don't throw — fall through to Phase 2
-              } else if (gpsErr.code === 'GPS_TIMEOUT') {
-                console.log('📍 GPS timed out, trying IP geolocation...');
-                // Fall through to Phase 2
-              } else if (gpsErr.code === 'GPS_UNAVAILABLE') {
-                console.log('📍 GPS unavailable, trying IP geolocation...');
-                // Fall through to Phase 2
               } else {
                 throw gpsErr; // Unknown error — propagate
               }
