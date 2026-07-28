@@ -120,29 +120,22 @@ class Game {
             throw new Error('Could not get GPS position. Move to an open area and reload.');
           });
 
-          // Got GPS — now confirm location with the user
-          await this.loadingStep('Confirming Location...', async () => {
-            // Do reverse geocode to get the place name
-            const placeName = await this.doReverseGeocode(
-              gpsPos.latitude,
-              gpsPos.longitude
-            );
+          // Got GPS — confirm location with user (no loadingStep, to avoid progress corruption on retry)
+          const placeName = await this.doReverseGeocode(
+            gpsPos.latitude,
+            gpsPos.longitude
+          );
+          const confirmed = await this.showLocationConfirm(
+            placeName,
+            gpsPos.latitude,
+            gpsPos.longitude,
+            gpsPos.accuracy
+          );
 
-            // Show location confirmation dialog
-            const confirmed = await this.showLocationConfirm(
-              placeName,
-              gpsPos.latitude,
-              gpsPos.longitude,
-              gpsPos.accuracy
-            );
-
-            if (!confirmed) {
-              // User said "No, try again" — throw to retry the outer loop
-              throw new Error('RETRY_GPS');
-            }
-
-            return gpsPos;
-          });
+          if (!confirmed) {
+            // User said "No, try again" — retry the whole GPS process
+            continue;
+          }
 
           // User confirmed — break out of the while loop
           break;
