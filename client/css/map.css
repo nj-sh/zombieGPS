@@ -329,6 +329,19 @@
   margin-bottom: 20px;
 }
 
+.location-confirm-notice {
+  font-size: 0.65rem;
+  color: var(--item-gold);
+  background: rgba(255, 215, 0, 0.08);
+  border: 1px solid rgba(255, 215, 0, 0.2);
+  border-radius: 6px;
+  padding: 8px 12px;
+  margin-bottom: 15px;
+  line-height: 1.4;
+  animation: fade-in 0.5s ease;
+  font-family: 'Poppins', sans-serif;
+}
+
 .location-confirm-buttons {
   display: flex;
   flex-direction: column;

@@ -217,6 +217,35 @@ class GPSTracker {
   isPermissionGranted() {
     return this.permissionGranted;
   }
+
+  /**
+   * Manually set a position (e.g. from IP geolocation fallback).
+   * This lets the rest of the system work with non-GPS coordinates.
+   * @param {number} latitude
+   * @param {number} longitude
+   * @param {number} [accuracy=5000] - Estimated accuracy in meters
+   */
+  setPosition(latitude, longitude, accuracy = 5000) {
+    this.currentPosition = {
+      coords: {
+        latitude,
+        longitude,
+        accuracy,
+        speed: null,
+        heading: null,
+      },
+      timestamp: Date.now(),
+    };
+    this.accuracy = accuracy;
+    this.speed = null;
+    this.heading = null;
+    this.isMoving = false;
+    this.lastUpdateTime = Date.now();
+
+    // Notify listeners so the game can proceed
+    this.notifyListeners('position', this.getPositionData());
+    console.log(`📍 Position set manually: ${latitude}, ${longitude} (±${Math.round(accuracy)}m)`);
+  }
 }
 
 // Singleton

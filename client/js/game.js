@@ -93,11 +93,13 @@ class Game {
         this.handlePositionUpdate(data);
       });
 
-      // Step 2: Request GPS — keep retrying until we get a real position
+      // Step 2: Get position — try GPS first, fallback to IP geolocation
       let gpsPos;
+      let locationSource = 'gps';
       while (true) {
         try {
           gpsPos = await this.loadingStep('Finding Your Location...', async () => {
+            // ── Phase 1: Try GPS (3 attempts) ──
             let attempts = 0;
             const maxAttempts = 3;
 
@@ -106,10 +108,12 @@ class Game {
               try {
                 const pos = await window.gps.requestPermission();
                 if (!pos) continue;
+                // GPS success — return the real position
                 return pos;
               } catch (err) {
                 console.warn(`GPS attempt ${attempts} failed:`, err.message);
                 if (err.code === 1) {
+                  // Permission denied — no point retrying or falling back
                   throw new Error('GPS permission denied. Please enable location services in your browser settings and reload.');
                 }
                 if (attempts < maxAttempts) {
@@ -117,10 +121,25 @@ class Game {
                 }
               }
             }
+
+            // ── Phase 2: GPS all failed — try IP geolocation as fallback ──
+            console.log('📍 GPS failed, trying IP geolocation as fallback...');
+            const ipPos = await this.getIPLocation();
+            if (ipPos) {
+              // Store IP position into the GPS tracker so getPositionData() works
+              window.gps.setPosition(ipPos.latitude, ipPos.longitude, ipPos.accuracy || 5000);
+              // Return with marker so confirmation dialog shows "approximate"
+              return { ...ipPos, isIPBased: true };
+            }
+
+            // Both GPS and IP failed — throw
             throw new Error('Could not get GPS position. Move to an open area and reload.');
           });
 
-          // Got GPS — confirm location with user (no loadingStep, to avoid progress corruption on retry)
+          // Remember source for confirmation dialog
+          locationSource = gpsPos.isIPBased ? 'ip' : 'gps';
+
+          // Confirm location with user (no loadingStep, to avoid progress corruption on retry)
           const placeName = await this.doReverseGeocode(
             gpsPos.latitude,
             gpsPos.longitude
@@ -129,21 +148,22 @@ class Game {
             placeName,
             gpsPos.latitude,
             gpsPos.longitude,
-            gpsPos.accuracy
+            gpsPos.accuracy,
+            locationSource
           );
 
           if (!confirmed) {
-            // User said "No, try again" — reset progress and retry GPS
+            // User said "No, try again" — reset progress and retry
             this.loadingProgress = 1;
             continue;
           }
 
-          // User confirmed — break out of the while loop
+          // User confirmed — break out
           break;
         } catch (err) {
           if (err.message === 'RETRY_GPS') {
-            console.log('📍 User rejected location, retrying GPS...');
-            continue; // Retry the whole GPS process
+            console.log('📍 User rejected location, retrying...');
+            continue;
           }
           throw err; // Real error, propagate up
         }
@@ -859,14 +879,47 @@ class Game {
   }
 
   /**
+   * Get approximate location via IP geolocation (free, no API key needed).
+   * Uses ip-api.com — returns city-level coordinates.
+   * @returns {Promise<{latitude: number, longitude: number, accuracy: number}|null>}
+   */
+  async getIPLocation() {
+    try {
+      const resp = await fetch('https://ip-api.com/json/', {
+        headers: { 'User-Agent': 'ZombieApocalypse/1.0' },
+      });
+      if (!resp.ok) return null;
+      const data = await resp.json();
+      if (data.status !== 'success') {
+        console.warn('IP geolocation returned non-success:', data);
+        return null;
+      }
+      console.log(`🌐 IP geolocation: ${data.city}, ${data.regionName}, ${data.country} (${data.lat}, ${data.lon})`);
+      return {
+        latitude: data.lat,
+        longitude: data.lon,
+        accuracy: 5000, // ~5km for city-level IP geolocation
+        source: 'ip',
+        city: data.city || '',
+        region: data.regionName || '',
+        country: data.country || '',
+      };
+    } catch (err) {
+      console.warn('IP geolocation failed:', err);
+      return null;
+    }
+  }
+
+  /**
    * Show the location confirmation dialog.
    * @param {string} placeName - The detected place name.
    * @param {number} lat - Latitude.
    * @param {number} lng - Longitude.
    * @param {number} accuracy - GPS accuracy in meters.
+   * @param {string} [source='gps'] - 'gps' or 'ip'
    * @returns {Promise<boolean>} true if confirmed, false if retry requested.
    */
-  showLocationConfirm(placeName, lat, lng, accuracy) {
+  showLocationConfirm(placeName, lat, lng, accuracy, source = 'gps') {
     return new Promise((resolve) => {
       const dialog = document.getElementById('location-confirm');
       const nameEl = document.getElementById('location-confirm-name');
@@ -874,6 +927,7 @@ class Game {
       const accuracyEl = document.getElementById('location-confirm-accuracy');
       const yesBtn = document.getElementById('location-confirm-yes');
       const noBtn = document.getElementById('location-confirm-no');
+      const noticeEl = document.getElementById('location-confirm-notice');
 
       if (!dialog || !nameEl) {
         resolve(true); // No dialog? Just proceed
@@ -882,7 +936,22 @@ class Game {
 
       nameEl.textContent = placeName;
       coordsEl.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-      accuracyEl.textContent = accuracy ? `Accuracy: ±${Math.round(accuracy)}m` : '';
+
+      if (source === 'ip') {
+        // IP-based — show approximate accuracy notice
+        accuracyEl.textContent = '📍 Approximate location (city-level)';
+        accuracyEl.style.color = 'var(--item-gold)';
+        if (noticeEl) {
+          noticeEl.style.display = 'block';
+        }
+      } else {
+        // GPS-based
+        accuracyEl.textContent = accuracy ? `Accuracy: ±${Math.round(accuracy)}m` : '';
+        accuracyEl.style.color = '';
+        if (noticeEl) {
+          noticeEl.style.display = 'none';
+        }
+      }
 
       dialog.style.display = 'flex';
 
