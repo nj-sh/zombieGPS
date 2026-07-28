@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { RateLimiterMemory } from 'rate-limiter-flexible';
 import { config } from './config.js';
 import { initDatabase } from './supabase.js';
 import { setupSocketHandlers } from './socket-handlers.js';
@@ -14,6 +15,14 @@ const clientDir = path.resolve(__dirname, '../client');
 
 const app = express();
 const httpServer = createServer(app);
+// ── Rate Limiter ──
+// Per-socket rate limits: 10 events/sec, 50 events/10sec burst
+const rateLimiter = new RateLimiterMemory({
+  points: 50,      // Max points per duration
+  duration: 10,     // Per 10 seconds
+  blockDuration: 5, // Block for 5 seconds if exceeded
+});
+
 const io = new Server(httpServer, {
   cors: {
     origin: '*',
@@ -21,6 +30,31 @@ const io = new Server(httpServer, {
   },
   pingInterval: 10000,
   pingTimeout: 5000,
+});
+
+// ── Socket.IO Rate Limiting Middleware ──
+io.use(async (socket, next) => {
+  // Allow connection event through (no rate limit on connect)
+  socket._rateLimitKey = `${socket.handshake.address}:${socket.id}`;
+  
+  // Intercept all event emissions to rate limit them
+  const originalOnevent = socket.onevent;
+  socket.onevent = async (packet) => {
+    try {
+      await rateLimiter.consume(socket._rateLimitKey, 1);
+    } catch (rlError) {
+      // Rate limit exceeded
+      console.warn(`⚠️  Rate limit exceeded for ${socket.id}`);
+      socket.emit('error', { message: 'Too many requests. Please slow down.' });
+      return; // Drop the event
+    }
+    // Allow the event through
+    if (originalOnevent) {
+      originalOnevent.call(socket, packet);
+    }
+  };
+  
+  next();
 });
 
 // Middleware

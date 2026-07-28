@@ -7,6 +7,18 @@ import {
 import { spawnItems, checkItemCollection, getSafeZonesNear } from './items-spawner.js';
 
 /**
+ * Sanitize player name — strip HTML tags and trim.
+ */
+function sanitizeName(raw) {
+  if (typeof raw !== 'string') return '';
+  // Strip any HTML tags
+  let clean = raw.replace(/<[^>]*>/g, '');
+  // Trim whitespace and limit length
+  clean = clean.trim().slice(0, 16);
+  return clean;
+}
+
+/**
  * Initialize all Socket.IO event handlers.
  * @param {import('socket.io').Server} io
  */
@@ -76,10 +88,11 @@ export function setupSocketHandlers(io) {
     // ── JOIN GAME ──
     socket.on(SOCKET_EVENTS.JOIN_GAME, async (data) => {
       try {
-        const { name, team, latitude, longitude } = data;
+        const { team, latitude, longitude } = data;
+        const name = sanitizeName(data.name);
 
-        // Validate name
-        if (!name || name.length < 3 || name.length > 16) {
+        // Validate name (after sanitization)
+        if (!name || name.length < 3) {
           socket.emit(SOCKET_EVENTS.ERROR, { message: 'Name must be 3-16 characters.' });
           return;
         }
@@ -475,11 +488,21 @@ export function setupSocketHandlers(io) {
       if (playerId) {
         const player = activePlayers.get(playerId);
         if (player) {
-          // Don't remove — persistent world keeps them
-          console.log(`🔌 ${player.name} disconnected (persistent)`);
+          console.log(`🔌 ${player.name} disconnected — will be removed after 5min timeout`);
         }
         socketPlayerMap.delete(socket.id);
         socket.broadcast.emit(SOCKET_EVENTS.PLAYER_LEFT, { id: playerId });
+
+        // Remove player from memory after 5 minutes
+        // This prevents memory leaks from disconnected players
+        setTimeout(() => {
+          const stillDisconnected = !socketPlayerMap.has(socket.id) && activePlayers.has(playerId);
+          if (stillDisconnected) {
+            activePlayers.delete(playerId);
+            playerSafeZoneState.delete(playerId);
+            console.log(`🧹 Cleaned up ${player?.name || playerId} from memory (disconnected >5min)`);
+          }
+        }, 5 * 60 * 1000);
       }
     });
   });
