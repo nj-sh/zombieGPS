@@ -1,5 +1,5 @@
 // Zombie Apocalypse - Service Worker
-const CACHE_NAME = 'zombie-apocalypse-v4';
+const CACHE_NAME = 'zombie-apocalypse-v5';
 
 const ASSETS_TO_CACHE = [
   '/',

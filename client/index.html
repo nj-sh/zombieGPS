@@ -185,11 +185,21 @@
         <div class="hud-stat">Zombies: <span class="value zombie-count" id="hud-zombies">0</span></div>
       </div>
 
-      <!-- Bottom Left: GPS Info + Location -->
+      <!-- Bottom Left: GPS Info + Location + Waypoint -->
       <div class="hud-bottom-left">
         <div class="hud-gps-info" id="hud-gps-accuracy">GPS: ±--</div>
         <div class="hud-gps-info" id="hud-gps-speed">Speed: --</div>
         <div class="hud-location" id="hud-gps-location">📍 Detecting location...</div>
+        <!-- Waypoint Navigation Display -->
+        <div class="hud-waypoint" id="hud-waypoint-info" style="display:none;">
+          <div class="hud-waypoint-row">
+            <span class="hud-waypoint-icon">🎯</span>
+            <span class="hud-waypoint-dist" id="hud-waypoint-dist">--</span>
+            <span class="hud-waypoint-dir" id="hud-waypoint-dir">N 0°</span>
+          </div>
+          <div style="font-size:0.55rem;color:rgba(255,255,255,0.3);">Tap map to set waypoint</div>
+          <button class="hud-waypoint-clear" id="hud-waypoint-clear" title="Clear waypoint">✕</button>
+        </div>
       </div>
 
       <!-- Bottom Right: Compass + Fullscreen -->

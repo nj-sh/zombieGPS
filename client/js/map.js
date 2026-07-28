@@ -4,6 +4,8 @@ class MapManager {
   constructor() {
     this.map = null;
     this.tileLayer = null;
+    this.satelliteLayer = null;
+    this.activeLayer = null;
     this.mainLayer = null;
     this.itemLayer = null;
     this.safeZoneLayer = null;
@@ -16,6 +18,12 @@ class MapManager {
     this.extractionPointMarkers = new Map();
     this.extractionPointLayer = null;
     this.renderDistance = 500; // meters
+    this.satelliteMode = false;
+    // Waypoint state
+    this.waypointMarker = null;
+    this.waypointLine = null;
+    this.waypointCoords = null;
+    this.waypointLayer = null;
   }
 
   /**
@@ -48,19 +56,43 @@ class MapManager {
     // OpenStreetMap tiles (works worldwide, includes labels)
     this.tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      minZoom: 3,
+      minZoom: 15,  // Limit zoom out to ~neighborhood level
       attribution: '&copy; OpenStreetMap contributors',
       noWrap: true,
-    }).addTo(this.map);
+    });
+
+    // Esri Satellite tiles (for satellite mode toggle)
+    this.satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 19,
+      minZoom: 15,
+      attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
+      noWrap: true,
+    });
+
+    // Start with OSM
+    this.activeLayer = this.tileLayer;
+    this.activeLayer.addTo(this.map);
 
     // Create layers
     this.itemLayer = L.layerGroup().addTo(this.map);
     this.safeZoneLayer = L.layerGroup().addTo(this.map);
     this.extractionPointLayer = L.layerGroup().addTo(this.map);
+    this.waypointLayer = L.layerGroup().addTo(this.map);
 
     // Create player renderer
     this.playerRenderer = new window.PlayerRenderer(this.map);
     window.playerRenderer = this.playerRenderer;
+
+    // Set up click handler for waypoints
+    this.map.on('click', (e) => this.handleMapClick(e));
+
+    // Restore satellite preference
+    try {
+      const pref = localStorage.getItem('za_satellite');
+      if (pref === 'true') {
+        this.toggleSatellite(true);
+      }
+    } catch (e) {}
 
     this.isInitialized = true;
     console.log('🗺️ Map initialized');
@@ -334,6 +366,213 @@ class MapManager {
     }
     this.extractionPointMarkers.clear();
     this.removeDirectionLine();
+  }
+
+  // ── SATELLITE TOGGLE ──
+
+  /**
+   * Toggle between OSM street map and satellite view.
+   */
+  toggleSatellite(enable) {
+    if (!this.map || !this.tileLayer || !this.satelliteLayer) return;
+
+    this.satelliteMode = enable;
+
+    if (enable) {
+      this.map.removeLayer(this.tileLayer);
+      this.satelliteLayer.addTo(this.map);
+      this.activeLayer = this.satelliteLayer;
+      // Add label overlay on satellite for street names
+      if (this.labelLayer) {
+        this.map.removeLayer(this.labelLayer);
+      }
+      this.labelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        minZoom: 15,
+        attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
+        noWrap: true,
+        opacity: 0.85,
+      }).addTo(this.map);
+    } else {
+      this.map.removeLayer(this.satelliteLayer);
+      if (this.labelLayer) {
+        this.map.removeLayer(this.labelLayer);
+        this.labelLayer = null;
+      }
+      this.tileLayer.addTo(this.map);
+      this.activeLayer = this.tileLayer;
+    }
+
+    try {
+      localStorage.setItem('za_satellite', enable.toString());
+    } catch (e) {}
+  }
+
+  /**
+   * Check if satellite mode is active.
+   */
+  isSatelliteMode() {
+    return this.satelliteMode;
+  }
+
+  // ── WAYPOINT NAVIGATION ──
+
+  /**
+   * Handle a click on the map — set a waypoint.
+   */
+  handleMapClick(e) {
+    if (!this.map || !window.game || window.game?.state !== 'playing') return;
+    this.setWaypoint(e.latlng.lat, e.latlng.lng);
+  }
+
+  /**
+   * Set a navigation waypoint at the given coordinates.
+   */
+  setWaypoint(lat, lng) {
+    if (!this.waypointLayer) return;
+
+    this.waypointCoords = { lat, lng };
+
+    // Clear existing waypoint
+    this.clearWaypoint();
+
+    // Create waypoint marker (pulsing green target)
+    const icon = L.divIcon({
+      html: `
+        <div style="
+          width:24px;height:24px;
+          display:flex;align-items:center;justify-content:center;
+          position:relative;
+        ">
+          <div style="
+            width:16px;height:16px;
+            border:3px solid #39ff14;
+            border-radius:50%;
+            background:rgba(57,255,20,0.2);
+            animation:glow-pulse 1.5s ease-in-out infinite;
+            box-shadow:0 0 10px rgba(57,255,20,0.5);
+          "></div>
+          <div style="
+            position:absolute;top:-14px;left:50%;transform:translateX(-50%);
+            font-size:0.55rem;color:#39ff14;
+            font-family:'Poppins',sans-serif;
+            font-weight:700;
+            text-shadow:0 1px 3px rgba(0,0,0,0.9);
+            white-space:nowrap;
+          ">📍 Waypoint</div>
+        </div>
+      `,
+      className: '',
+      iconSize: [30, 30],
+      iconAnchor: [15, 15],
+    });
+
+    this.waypointMarker = L.marker([lat, lng], {
+      icon,
+      interactive: false,
+    }).addTo(this.waypointLayer);
+
+    // Draw navigation line (dashed yellow)
+    const playerPos = window.gps?.getPositionData();
+    if (playerPos) {
+      this.waypointLine = L.polyline([[playerPos.latitude, playerPos.longitude], [lat, lng]], {
+        color: '#ffd700',
+        weight: 2,
+        opacity: 0.4,
+        dashArray: '6, 8',
+        interactive: false,
+      }).addTo(this.waypointLayer);
+    }
+
+    // Calculate and show distance/bearing
+    this.updateWaypointInfo(playerPos);
+
+    // Notify the game controller
+    if (window.game && typeof window.game.onWaypointSet === 'function') {
+      window.game.onWaypointSet(this.waypointCoords);
+    }
+  }
+
+  /**
+   * Update the waypoint direction line as the player moves.
+   */
+  updateWaypointLine(playerLat, playerLng) {
+    if (!this.waypointCoords || !this.waypointLayer) return;
+
+    if (this.waypointLine) {
+      this.waypointLine.setLatLngs([[playerLat, playerLng], [this.waypointCoords.lat, this.waypointCoords.lng]]);
+    } else {
+      this.waypointLine = L.polyline([[playerLat, playerLng], [this.waypointCoords.lat, this.waypointCoords.lng]], {
+        color: '#ffd700',
+        weight: 2,
+        opacity: 0.4,
+        dashArray: '6, 8',
+        interactive: false,
+      }).addTo(this.waypointLayer);
+    }
+
+    // Update distance/bearing info
+    this.updateWaypointInfo({ latitude: playerLat, longitude: playerLng });
+
+    // Check if player reached waypoint (within 10m)
+    const dist = this.map.distance([playerLat, playerLng], [this.waypointCoords.lat, this.waypointCoords.lng]);
+    if (dist < 10) {
+      this.clearWaypoint();
+      if (window.game && typeof window.game.onWaypointReached === 'function') {
+        window.game.onWaypointReached();
+      }
+    }
+  }
+
+  /**
+   * Calculate and update HUD with waypoint distance and bearing.
+   */
+  updateWaypointInfo(playerPos) {
+    if (!this.waypointCoords || !playerPos) return;
+
+    const dist = this.map.distance(
+      [playerPos.latitude, playerPos.longitude],
+      [this.waypointCoords.lat, this.waypointCoords.lng]
+    );
+
+    const bearing = this.getBearing(
+      playerPos.latitude, playerPos.longitude,
+      this.waypointCoords.lat, this.waypointCoords.lng
+    );
+
+    window.hud.updateWaypoint(dist, bearing, this.waypointCoords);
+  }
+
+  /**
+   * Get bearing (direction) from one point to another.
+   */
+  getBearing(lat1, lng1, lat2, lng2) {
+    const toRad = (deg) => deg * (Math.PI / 180);
+    const toDeg = (rad) => rad * (180 / Math.PI);
+    const dLng = toRad(lng2 - lng1);
+    const y = Math.sin(dLng) * Math.cos(toRad(lat2));
+    const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+              Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLng);
+    return (toDeg(Math.atan2(y, x)) + 360) % 360;
+  }
+
+  /**
+   * Clear the waypoint marker and line.
+   */
+  clearWaypoint() {
+    if (this.waypointMarker) {
+      this.waypointLayer.removeLayer(this.waypointMarker);
+      this.waypointMarker = null;
+    }
+    if (this.waypointLine) {
+      this.waypointLayer.removeLayer(this.waypointLine);
+      this.waypointLine = null;
+    }
+    this.waypointCoords = null;
+    // Clear HUD display
+    if (window.hud && typeof window.hud.updateWaypoint === 'function') {
+      window.hud.updateWaypoint(null, null, null);
+    }
   }
 
   /**

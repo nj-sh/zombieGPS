@@ -14,6 +14,7 @@ class SettingsPanel {
       renderDistance: 500,
       quality: 'high', // low, medium, high
       fullscreen: false,
+      satelliteView: false,
     };
 
     this.loadSettings();
@@ -92,6 +93,10 @@ class SettingsPanel {
           <input type="checkbox" id="setting-fullscreen" ${this.settings.fullscreen ? 'checked' : ''}>
           Fullscreen
         </label>
+        <label style="display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:0.85rem;">
+          <input type="checkbox" id="setting-satellite" ${this.settings.satelliteView ? 'checked' : ''}>
+          🛰️ Satellite View
+        </label>
       </div>
 
       <div style="margin-top:auto;padding-top:10px;border-top:1px solid rgba(255,255,255,0.1);">
@@ -158,6 +163,15 @@ class SettingsPanel {
     document.getElementById('setting-fullscreen')?.addEventListener('change', (e) => {
       this.settings.fullscreen = e.target.checked;
       this.toggleFullscreen(e.target.checked);
+      this.saveSettings();
+    });
+
+    // Satellite View
+    document.getElementById('setting-satellite')?.addEventListener('change', (e) => {
+      this.settings.satelliteView = e.target.checked;
+      if (window.mapManager) {
+        window.mapManager.toggleSatellite(e.target.checked);
+      }
       this.saveSettings();
     });
   }

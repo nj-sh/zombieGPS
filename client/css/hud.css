@@ -287,6 +287,66 @@
   box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
 }
 
+/* ── Waypoint Navigation Display ── */
+.hud-waypoint {
+  position: relative;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-top: 4px;
+  animation: slide-up 0.25s ease;
+  pointer-events: auto;
+}
+
+.hud-waypoint-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-waypoint-icon {
+  font-size: 0.9rem;
+}
+
+.hud-waypoint-dist {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--item-gold);
+  font-family: monospace;
+  letter-spacing: 0.05em;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+
+.hud-waypoint-dir {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: monospace;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+
+.hud-waypoint-clear {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px; height: 18px;
+  background: rgba(193, 18, 31, 0.8);
+  border: none;
+  border-radius: 50%;
+  color: white;
+  font-size: 0.55rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: opacity var(--transition-normal);
+}
+
+.hud-waypoint-clear:hover {
+  opacity: 1;
+}
+
 /* ── Inventory Bag Button ── */
 .hud-bag-btn {
   position: absolute;

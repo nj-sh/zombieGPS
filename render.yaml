@@ -1,0 +1,22 @@
+# Zombie Apocalypse — Render Deployment Config
+# https://render.com/docs/yaml-spec
+
+services:
+  - type: web
+    name: zombie-apocalypse
+    runtime: node
+    repo: https://github.com/nj-sh/zombieGPS
+    plan: free
+    region: singapore
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false    # Set via Render dashboard
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

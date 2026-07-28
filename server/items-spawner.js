@@ -35,26 +35,39 @@ function generateSafeZonesNear(lat, lng) {
 
 /**
  * Spawn loot items at a specific safe zone.
+ * Each zone type has its own loot table — realistic distribution by building type.
+ *   Hospital → mostly health packs + medicine
+ *   Police Station → mostly ammo
+ *   Military Base → armor + keys + some ammo
  */
 function spawnSafeZoneLoot(zone, zoneIndex) {
   const items = [];
-  const lootTable = [
-    { type: ITEM_TYPES.HEALTH_PACK, count: 2 },
-    { type: ITEM_TYPES.AMMO, count: 1 },
-    { type: ITEM_TYPES.FOOD, count: 1 },
-    { type: ITEM_TYPES.MEDICINE, count: 1 },
-    { type: ITEM_TYPES.ENERGY_DRINK, count: 1 },
-  ];
 
-  // Special loot per zone type
-  if (zone.type === 'hospital') {
-    lootTable.push({ type: ITEM_TYPES.HEALTH_PACK, count: 2 }); // Extra meds at hospital
-  } else if (zone.type === 'police_station') {
-    lootTable.push({ type: ITEM_TYPES.AMMO, count: 2 }); // Extra ammo at police
-  } else if (zone.type === 'military_base') {
-    lootTable.push({ type: ITEM_TYPES.ARMOR, count: 1 }); // Armor at military
-    lootTable.push({ type: ITEM_TYPES.KEYS, count: 1 });  // Keys at military
-  }
+  // Loot tables per zone type
+  const lootTables = {
+    hospital: [
+      { type: ITEM_TYPES.HEALTH_PACK, count: 4 },  // Lots of health at hospital
+      { type: ITEM_TYPES.MEDICINE, count: 3 },       // Extra medicine
+      { type: ITEM_TYPES.FOOD, count: 1 },
+      { type: ITEM_TYPES.ENERGY_DRINK, count: 1 },
+    ],
+    police_station: [
+      { type: ITEM_TYPES.AMMO, count: 4 },            // Lots of ammo at police
+      { type: ITEM_TYPES.MEDICINE, count: 1 },
+      { type: ITEM_TYPES.FOOD, count: 1 },
+      { type: ITEM_TYPES.ENERGY_DRINK, count: 1 },
+    ],
+    military_base: [
+      { type: ITEM_TYPES.ARMOR, count: 2 },            // Armor at military
+      { type: ITEM_TYPES.KEYS, count: 2 },             // Keys at military
+      { type: ITEM_TYPES.AMMO, count: 2 },             // Some ammo too
+      { type: ITEM_TYPES.HEALTH_PACK, count: 1 },
+      { type: ITEM_TYPES.FOOD, count: 1 },
+      { type: ITEM_TYPES.ENERGY_DRINK, count: 1 },
+    ],
+  };
+
+  const lootTable = lootTables[zone.type] || lootTables.hospital;
 
   let idx = 0;
   for (const entry of lootTable) {
@@ -69,7 +82,60 @@ function spawnSafeZoneLoot(zone, zoneIndex) {
         fromSafeZone: zone.id,  // Tag so clients know it's safe-zone loot
       });
     }
-    idx++;
+  }
+
+  return items;
+}
+
+/**
+ * Spawn world items — mech parts and basic supplies across the map.
+ * Guns/ammo are rare outside of police stations (handled by safe zone loot above).
+ */
+function spawnWorldItems(centerLat, centerLng) {
+  const items = [];
+
+  // Spawn 3 mech parts (required for escape) — scattered across world
+  for (let i = 0; i < GAME_CONFIG.MECH_PARTS_REQUIRED; i++) {
+    const pos = randomPosition(centerLat, centerLng, 3);
+    items.push({
+      id: `mech-${i}`,
+      type: ITEM_TYPES.MECH_PART,
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      is_collected: false,
+    });
+  }
+
+  // Spawn health packs (some in world, fewer than at hospital)
+  for (let i = 0; i < 3; i++) {
+    const pos = randomPosition(centerLat, centerLng, 4);
+    items.push({
+      id: `health-${i}`,
+      type: ITEM_TYPES.HEALTH_PACK,
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      is_collected: false,
+    });
+  }
+
+  // Basic supplies (no ammo, no armor, no keys in world spawn)
+  const supplyTypes = [
+    { type: ITEM_TYPES.FOOD, count: 4 },
+    { type: ITEM_TYPES.MEDICINE, count: 2 },
+    { type: ITEM_TYPES.ENERGY_DRINK, count: 3 },
+  ];
+
+  for (const entry of supplyTypes) {
+    for (let i = 0; i < entry.count; i++) {
+      const pos = randomPosition(centerLat, centerLng, 3);
+      items.push({
+        id: `supply-${entry.type}-${i}`,
+        type: entry.type,
+        latitude: pos.latitude,
+        longitude: pos.longitude,
+        is_collected: false,
+      });
+    }
   }
 
   return items;
@@ -82,46 +148,13 @@ function spawnSafeZoneLoot(zone, zoneIndex) {
 export function spawnItems(centerLat = 40.7128, centerLng = -74.0060) {
   const items = [];
 
-  // ── World-spawn items ──
-
-  // Spawn 3 mech parts (required for escape)
-  for (let i = 0; i < GAME_CONFIG.MECH_PARTS_REQUIRED; i++) {
-    const pos = randomPosition(centerLat, centerLng, 3);
-    items.push({
-      id: `mech-${i}`,
-      type: ITEM_TYPES.MECH_PART,
-      latitude: pos.latitude,
-      longitude: pos.longitude,
-      is_collected: false,
-    });
-  }
-
-  // Spawn health packs
-  for (let i = 0; i < 5; i++) {
-    const pos = randomPosition(centerLat, centerLng, 4);
-    items.push({
-      id: `health-${i}`,
-      type: ITEM_TYPES.HEALTH_PACK,
-      latitude: pos.latitude,
-      longitude: pos.longitude,
-      is_collected: false,
-    });
-  }
-
-  // Spawn other supplies
-  const supplyTypes = [ITEM_TYPES.AMMO, ITEM_TYPES.FOOD, ITEM_TYPES.MEDICINE, ITEM_TYPES.ENERGY_DRINK];
-  for (let i = 0; i < supplyTypes.length; i++) {
-    const pos = randomPosition(centerLat, centerLng, 3);
-    items.push({
-      id: `supply-${i}`,
-      type: supplyTypes[i],
-      latitude: pos.latitude,
-      longitude: pos.longitude,
-      is_collected: false,
-    });
-  }
+  // ── World-spawn items (food, medicine, mech parts, some health packs) ──
+  // No ammo, armor, or keys in the wild — those are at police stations / military only
+  const worldItems = spawnWorldItems(centerLat, centerLng);
+  items.push(...worldItems);
 
   // ── Safe zone loot items — generated near the player ──
+  // Each safe zone type has its own themed loot table
   const safeZones = generateSafeZonesNear(centerLat, centerLng);
   safeZones.forEach((zone, i) => {
     const loot = spawnSafeZoneLoot(zone, i);

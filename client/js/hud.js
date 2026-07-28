@@ -27,6 +27,12 @@ class HUD {
       gpsSpeed: document.getElementById('hud-gps-speed'),
       gpsLocation: document.getElementById('hud-gps-location'),
 
+      // Waypoint info
+      waypointInfo: document.getElementById('hud-waypoint-info'),
+      waypointDist: document.getElementById('hud-waypoint-dist'),
+      waypointDir: document.getElementById('hud-waypoint-dir'),
+      waypointClear: document.getElementById('hud-waypoint-clear'),
+
       // Bottom Right
       compassNeedle: document.getElementById('hud-compass-needle'),
 
@@ -44,6 +50,14 @@ class HUD {
       escapeBtn: document.getElementById('hud-escape-btn'),
       escapeStatus: document.getElementById('hud-escape-status'),
     };
+
+    // Waypoint clear button
+    if (this.elements.waypointClear) {
+      this.elements.waypointClear.addEventListener('click', () => {
+        if (window.mapManager) window.mapManager.clearWaypoint();
+        this.updateWaypoint(null, null, null);
+      });
+    }
   }
 
   /**
@@ -190,6 +204,39 @@ class HUD {
   updateLocation(placeName) {
     if (this.elements.gpsLocation) {
       this.elements.gpsLocation.textContent = `📍 ${placeName}`;
+    }
+  }
+
+  /**
+   * Update the waypoint navigation display.
+   */
+  updateWaypoint(distance, bearing, coords) {
+    if (!this.elements.waypointInfo) return;
+
+    if (distance !== null && bearing !== null) {
+      this.elements.waypointInfo.style.display = 'flex';
+
+      // Format distance
+      let distStr;
+      if (distance < 1000) {
+        distStr = `${Math.round(distance)}m`;
+      } else {
+        distStr = `${(distance / 1000).toFixed(1)}km`;
+      }
+
+      // Format bearing as compass direction
+      const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      const dirIndex = Math.round(bearing / 45) % 8;
+      const dirLabel = dirs[dirIndex];
+
+      if (this.elements.waypointDist) {
+        this.elements.waypointDist.textContent = distStr;
+      }
+      if (this.elements.waypointDir) {
+        this.elements.waypointDir.textContent = `${dirLabel} ${Math.round(bearing)}°`;
+      }
+    } else {
+      this.elements.waypointInfo.style.display = 'none';
     }
   }
 

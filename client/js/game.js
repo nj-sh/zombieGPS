@@ -714,8 +714,13 @@ class Game {
     window.hud.updateGPSInfo(data.accuracy, data.speed);
     window.hud.updateCompass(window.deviceOrientation.getHeading());
 
-    window.mapManager.centerOnPlayer(data.latitude, data.longitude);      // Update direction line to nearest extraction point
+    window.mapManager.centerOnPlayer(data.latitude, data.longitude);
+
+      // Update direction line to nearest extraction point
       window.mapManager.updateDirectionLine(data.latitude, data.longitude);
+
+      // Update waypoint navigation line (if a waypoint is set)
+      window.mapManager.updateWaypointLine(data.latitude, data.longitude);
 
       // Reverse geocode if moved significantly (>150m)
       if (this._lastGeocodePos) {
@@ -929,6 +934,24 @@ class Game {
         this.survivalTime = Math.floor((Date.now() - this.survivalStartTime) / 1000);
       }
     }, 1000);
+  }
+
+  /**
+   * Called when a waypoint is placed on the map — show notification.
+   */
+  onWaypointSet(coords) {
+    if (window.notifications) {
+      window.notifications.show('📍 Waypoint set — navigate to the marker!', 'info', 3000);
+    }
+  }
+
+  /**
+   * Called when the player reaches a waypoint — show notification.
+   */
+  onWaypointReached() {
+    if (window.notifications) {
+      window.notifications.show('🎯 Reached waypoint!', 'success', 3000);
+    }
   }
 
   /**
