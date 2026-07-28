@@ -91,21 +91,21 @@ class Game {
       // Step 2: Request GPS — keep retrying until we get a real position
       // (No fallback to NYC defaults — game waits for actual GPS)
       await this.loadingStep('Requesting GPS Permission...', async () => {
+        // Register GPS update listener ONCE (before retry loop to avoid duplicates)
+        window.gps.on('position', (data) => {
+          this.handlePositionUpdate(data);
+        });
+
         let attempts = 0;
-        const maxAttempts = 5;
+        const maxAttempts = 3;
 
         while (attempts < maxAttempts) {
           attempts++;
           try {
             const pos = await window.gps.requestPermission();
 
-            // Check if accuracy is reasonable (< 100m is good for gameplay)
-            if (pos.accuracy !== null && pos.accuracy < 200) {
-              // Listen for GPS updates
-              window.gps.on('position', (data) => {
-                this.handlePositionUpdate(data);
-              });
-
+            // Accept position if accuracy is null (unknown) or under 200m
+            if (pos.accuracy === null || pos.accuracy < 200) {
               return pos;
             }
 
