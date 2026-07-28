@@ -97,6 +97,14 @@ class SocketManager {
   }
 
   /**
+   * Update player health (after using medicine).
+   */
+  updateHealth(health) {
+    if (!this.socket || !this.connected) return;
+    this.socket.emit('update_health', { health });
+  }
+
+  /**
    * Craft radio (when 3 mech parts collected).
    */
   craftRadio() {

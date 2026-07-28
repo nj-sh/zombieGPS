@@ -18,6 +18,7 @@ export const ITEM_TYPES = {
   AMMO: 'ammo',
   FOOD: 'food',
   MEDICINE: 'medicine',
+  GUN: 'gun',
   ENERGY_DRINK: 'energy_drink',
   ARMOR: 'armor',
   KEYS: 'keys',
@@ -65,6 +66,7 @@ export const SOCKET_EVENTS = {
   JOIN_GAME: 'join_game',
   UPDATE_POSITION: 'update_position',
   COLLECT_ITEM: 'collect_item',
+  UPDATE_HEALTH: 'update_health',
   CRAFT_RADIO: 'craft_radio',
   ESCAPE: 'escape',
 

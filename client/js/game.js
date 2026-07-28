@@ -379,8 +379,10 @@ class Game {
     // Setup player inventory if missing or empty ([] is truthy in JS, so check length)
     if (!this.player.inventory || this.player.inventory.length === 0) {
       this.player.inventory = [
-        { type: 'medicine', name: 'Medicine' },
-        { type: 'medicine', name: 'Medicine' },
+        { type: 'medicine', name: 'Medicine', healAmount: 33 },
+        { type: 'medicine', name: 'Medicine', healAmount: 33 },
+        { type: 'medicine', name: 'Medicine', healAmount: 33 },
+        { type: 'gun', name: 'Pistol', bullets: 7, damage: 3 },
       ];
     }
 
@@ -1061,6 +1063,43 @@ class Game {
   onWaypointReached() {
     if (window.notifications) {
       window.notifications.show('🎯 Reached waypoint!', 'success', 3000);
+    }
+  }
+
+  /**
+   * Use an item from the inventory by slot index.
+   * Medicine: heals 33 HP per use.
+   * Gun: shows ammo info.
+   */
+  useItem(index) {
+    if (!this.player || !this.player.inventory) return;
+    const item = this.player.inventory[index];
+    if (!item) return;
+
+    if (item.type === 'medicine') {
+      // Consume medicine to heal
+      const healAmount = item.healAmount || 33;
+      const oldHealth = this.player.health || 100;
+      const newHealth = Math.min(100, oldHealth + healAmount);
+      this.player.health = newHealth;
+
+      // Remove the used medicine from inventory
+      this.player.inventory.splice(index, 1);
+
+      // Update UI
+      window.hud.updateHealth(newHealth);
+      this.updateInventoryUI();
+      window.notifications.show(`💊 Used Medicine (+${healAmount} HP)`, 'success', 2000);
+      if (window.audio) window.audio.playItemPickup();
+
+      // Sync health to server
+      window.socketManager.updateHealth(newHealth);
+
+    } else if (item.type === 'gun') {
+      // Show gun info
+      const bullets = item.bullets || 0;
+      const damage = item.damage || 3;
+      window.notifications.show(`🔫 ${item.name || 'Pistol'} — ${bullets} bullets left, ${damage} DMG each`, 'info', 3000);
     }
   }
 

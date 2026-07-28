@@ -419,6 +419,42 @@
   box-shadow: 0 0 5px rgba(255, 215, 0, 0.3);
 }
 
+/* Interactive (clickable) inventory slot */
+.hud-inventory-slot.usable {
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.hud-inventory-slot.usable:hover {
+  transform: scale(1.15);
+  border-color: var(--neon-green);
+  box-shadow: 0 0 15px rgba(57, 255, 20, 0.4);
+  background: rgba(57, 255, 20, 0.1);
+}
+
+.hud-inventory-slot.usable:active {
+  transform: scale(0.95);
+}
+
+/* Extra info badge on inventory slots (e.g. ammo count, heal amount) */
+.hud-item-extra {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  background: var(--blood-red);
+  color: white;
+  font-size: 0.5rem;
+  font-weight: 700;
+  padding: 1px 4px;
+  border-radius: 6px;
+  min-width: 14px;
+  text-align: center;
+  box-shadow: 0 0 4px rgba(193, 18, 31, 0.6);
+  font-family: monospace;
+  line-height: 1.2;
+}
+
 /* ── Mech Parts Tracker ── */
 .hud-mech-parts {
   display: flex;

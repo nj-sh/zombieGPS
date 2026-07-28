@@ -342,6 +342,27 @@ export function setupSocketHandlers(io) {
       }
     });
 
+    // ── UPDATE HEALTH ──
+    socket.on(SOCKET_EVENTS.UPDATE_HEALTH, (data) => {
+      const playerId = socketPlayerMap.get(socket.id);
+      if (!playerId) return;
+      const player = activePlayers.get(playerId);
+      if (!player) return;
+      const { health } = data;
+      if (typeof health !== 'number' || health < 0 || health > 100) return;
+      player.health = health;
+      db.updatePlayer(playerId, { health }).catch(() => {});
+      // Broadcast updated health to others
+      socket.broadcast.emit(SOCKET_EVENTS.PLAYER_UPDATED, {
+        id: playerId,
+        health: player.health,
+        team: player.team,
+        status: player.status,
+        latitude: player.latitude,
+        longitude: player.longitude,
+      });
+    });
+
     // ── CRAFT RADIO ──
     socket.on(SOCKET_EVENTS.CRAFT_RADIO, async () => {
       const playerId = socketPlayerMap.get(socket.id);

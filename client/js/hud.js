@@ -251,7 +251,9 @@ class HUD {
   }
 
   /**
-   * Update inventory items.
+   * Update inventory items with interactive click-to-use slots.
+   * Each slot shows the item emoji + extra info (like ammo count).
+   * Clicking a slot triggers the useItem callback.
    */
   updateInventory(items) {
     if (!this.elements.inventory) return;
@@ -261,10 +263,38 @@ class HUD {
     for (let i = 0; i < slots; i++) {
       const item = items && items[i];
       const filled = item ? 'filled' : '';
-      const label = item ? this.getItemEmoji(item.type) : '';
-      html += `<div class="hud-inventory-slot ${filled}">${label}</div>`;
+      const usable = item && (item.type === 'medicine' || item.type === 'gun') ? 'usable' : '';
+      let label = '';
+      let extra = '';
+
+      if (item) {
+        label = this.getItemEmoji(item.type);
+
+        // Show extra info for certain items
+        if (item.type === 'gun' && item.bullets !== undefined) {
+          extra = `<span class="hud-item-extra">${item.bullets}</span>`;
+        }
+        if (item.type === 'medicine') {
+          extra = `<span class="hud-item-extra">+33</span>`;
+        }
+      }
+
+      html += `<div class="hud-inventory-slot ${filled} ${usable}" data-slot-index="${i}">
+        ${label}${extra}
+      </div>`;
     }
     this.elements.inventory.innerHTML = html;
+
+    // Attach click handlers for usable items
+    const slotsEls = this.elements.inventory.querySelectorAll('.hud-inventory-slot.usable');
+    slotsEls.forEach(el => {
+      el.addEventListener('click', (e) => {
+        const index = parseInt(el.dataset.slotIndex, 10);
+        if (window.game && typeof window.game.useItem === 'function') {
+          window.game.useItem(index);
+        }
+      });
+    });
   }
 
   /**
@@ -277,6 +307,7 @@ class HUD {
       ammo: '🔫',
       food: '🍖',
       medicine: '💊',
+      gun: '🔫',
       energy_drink: '⚡',
       armor: '🛡️',
       keys: '🔑',
