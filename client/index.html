@@ -181,6 +181,34 @@
           </div>
         </div>
       </div>
+
+      <!-- Manual Location Entry (shown when GPS + IP both fail) -->
+      <div class="manual-location" id="manual-location" style="display:none;">
+        <div class="manual-location-content">
+          <div class="manual-location-icon">🌍</div>
+          <div class="manual-location-title">Enter Your Location</div>
+          <div class="manual-location-desc">GPS couldn't find you. Type your city or area below to start playing.</div>
+          <div class="manual-location-input-group">
+            <input
+              type="text"
+              id="manual-location-input"
+              class="manual-location-input"
+              placeholder="e.g. Mumbai, India or New York, NY"
+              autocomplete="off"
+              spellcheck="false"
+              enterkeyhint="search"
+            >
+            <button class="manual-location-search-btn" id="manual-location-search-btn">🔍 Search</button>
+          </div>
+          <div class="manual-location-error" id="manual-location-error"></div>
+          <div class="manual-location-results" id="manual-location-results"></div>
+          <div class="manual-location-buttons">
+            <button class="manual-location-btn manual-location-back" id="manual-location-back">
+              ↩ Try GPS again
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ════════════════════════════════════════════════════════

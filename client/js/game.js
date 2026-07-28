@@ -153,7 +153,15 @@ class Game {
                 return { ...ipPos, isIPBased: true };
               }
 
-              // Both GPS and IP failed
+              // ── Phase 3: Both GPS and IP failed — ask user to type their location ──
+              console.log('📍 GPS + IP both failed, asking for manual location...');
+              const manualPos = await this.showManualLocationDialog();
+              if (manualPos) {
+                window.gps.setPosition(manualPos.latitude, manualPos.longitude, manualPos.accuracy || 5000);
+                return { ...manualPos, isIPBased: true };
+              }
+
+              // User cancelled manual entry too
               throw new Error('Could not determine your location. Make sure location services are enabled and try again.');
             }
           });
@@ -968,6 +976,145 @@ class Game {
    */
   showLocationConfirm(placeName, lat, lng, accuracy, source = 'gps') {
     return new Promise((resolve) => {
+  /**
+   * Geocode a text address to coordinates using Nominatim's search API.
+   * This lets players type "Mumbai, India" or "5th Avenue, New York" and
+   * get back lat/lng coordinates.
+   * @param {string} query - The place name or address to search for
+   * @returns {Promise<{latitude: number, longitude: number, displayName: string}|null>}
+   */
+  async geocodeAddress(query) {
+    if (!query || query.trim().length < 3) return null;
+    try {
+      const resp = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&accept-language=en`,
+        { headers: { 'User-Agent': 'ZombieApocalypse/1.0' } }
+      );
+      if (!resp.ok) return null;
+      const results = await resp.json();
+      if (!results || results.length === 0) return null;
+      // Return the best (first) result
+      const best = results[0];
+      return {
+        latitude: parseFloat(best.lat),
+        longitude: parseFloat(best.lon),
+        displayName: best.display_name,
+        accuracy: 5000, // Manual entry = city-level
+      };
+    } catch (err) {
+      console.warn('Geocode search error:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Show a manual location entry dialog when GPS and IP geolocation both fail.
+   * The user types a city/area name, we geocode it, and they pick a result.
+   * @returns {Promise<{latitude: number, longitude: number, accuracy: number}|null>}
+   *   Resolves with coordinates if the user selects a location, or null if they cancel.
+   */
+  showManualLocationDialog() {
+    return new Promise((resolve) => {
+      const dialog = document.getElementById('manual-location');
+      const input = document.getElementById('manual-location-input');
+      const searchBtn = document.getElementById('manual-location-search-btn');
+      const resultsEl = document.getElementById('manual-location-results');
+      const errorEl = document.getElementById('manual-location-error');
+      const backBtn = document.getElementById('manual-location-back');
+
+      if (!dialog || !input) {
+        resolve(null);
+        return;
+      }
+
+      let resolved = false;
+
+      const cleanup = () => {
+        dialog.style.display = 'none';
+        resolved = true;
+      };
+
+      const doSearch = async () => {
+        if (resolved) return;
+        const query = input.value.trim();
+        if (query.length < 3) {
+          errorEl.textContent = 'Type at least 3 characters to search.';
+          errorEl.style.display = 'block';
+          return;
+        }
+
+        errorEl.style.display = 'none';
+        resultsEl.innerHTML = '<div class="manual-location-loading">Searching...</div>';
+        searchBtn.disabled = true;
+
+        const result = await this.geocodeAddress(query);
+        searchBtn.disabled = false;
+
+        if (!result || !result.displayName) {
+          resultsEl.innerHTML = '<div class="manual-location-no-results">No results found. Try a different name.</div>';
+          return;
+        }
+
+        // Show the result as a selectable option
+        const shortName = result.displayName.split(',').slice(0, 3).join(',');
+        resultsEl.innerHTML = `
+          <div class="manual-location-result" data-lat="${result.latitude}" data-lng="${result.longitude}">
+            <div class="manual-location-result-icon">📍</div>
+            <div class="manual-location-result-info">
+              <div class="manual-location-result-name">${this.escapeHtml(shortName)}</div>
+              <div class="manual-location-result-coords">${result.latitude.toFixed(4)}, ${result.longitude.toFixed(4)}</div>
+            </div>
+          </div>
+        `;
+
+        // Click handler on the result
+        const resultDiv = resultsEl.querySelector('.manual-location-result');
+        if (resultDiv) {
+          resultDiv.addEventListener('click', () => {
+            if (resolved) return;
+            const lat = parseFloat(resultDiv.dataset.lat);
+            const lng = parseFloat(resultDiv.dataset.lng);
+            cleanup();
+            resolve({ latitude: lat, longitude: lng, accuracy: 5000 });
+          });
+        }
+      };
+
+      // Search on button click
+      searchBtn.addEventListener('click', doSearch);
+
+      // Search on Enter key
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          doSearch();
+        }
+      });
+
+      // Back button → cancel
+      backBtn.addEventListener('click', () => {
+        if (resolved) return;
+        cleanup();
+        resolve(null);
+      }, { once: true });
+
+      // Show the dialog
+      dialog.style.display = 'flex';
+      setTimeout(() => input.focus(), 300);
+    });
+  }
+
+  /**
+   * Show the location confirmation dialog.
+   * @param {string} placeName - The detected place name.
+   * @param {number} lat - Latitude.
+   * @param {number} lng - Longitude.
+   * @param {number} accuracy - GPS accuracy in meters.
+   * @param {string} [source='gps'] - 'gps' or 'ip'
+   * @returns {Promise<boolean>} true if confirmed, false if retry requested.
+   */
+  showLocationConfirm(placeName, lat, lng, accuracy, source = 'gps') {
+    return new Promise((resolve) => {
       const dialog = document.getElementById('location-confirm');
       const nameEl = document.getElementById('location-confirm-name');
       const coordsEl = document.getElementById('location-confirm-coords');
@@ -1136,6 +1283,15 @@ class Game {
 
   toRad(deg) {
     return deg * (Math.PI / 180);
+  }
+
+  /**
+   * Escape HTML to prevent XSS when displaying user-generated content.
+   */
+  escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
   }
 
   /**

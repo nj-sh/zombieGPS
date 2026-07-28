@@ -414,6 +414,194 @@
   color: var(--white);
 }
 
+/* ── Manual Location Entry Dialog ── */
+.manual-location {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2100;
+  animation: fade-in 0.5s ease;
+  pointer-events: auto;
+}
+
+.manual-location-content {
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid rgba(0, 170, 255, 0.3);
+  border-radius: 16px;
+  padding: 25px 28px;
+  max-width: 360px;
+  width: 90%;
+  text-align: center;
+  box-shadow: 0 0 40px rgba(0, 170, 255, 0.1);
+  animation: slide-up 0.4s ease;
+}
+
+.manual-location-icon {
+  font-size: 2.5rem;
+  margin-bottom: 8px;
+}
+
+.manual-location-title {
+  font-family: 'Cinzel', serif;
+  font-size: 1rem;
+  color: var(--safe-zone);
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+  text-shadow: 0 0 10px rgba(0, 170, 255, 0.3);
+}
+
+.manual-location-desc {
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 16px;
+  line-height: 1.4;
+}
+
+.manual-location-input-group {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.manual-location-input {
+  flex: 1;
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: var(--white);
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color var(--transition-normal);
+}
+
+.manual-location-input:focus {
+  border-color: var(--safe-zone);
+  box-shadow: 0 0 10px rgba(0, 170, 255, 0.2);
+}
+
+.manual-location-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.manual-location-search-btn {
+  padding: 10px 16px;
+  background: linear-gradient(135deg, var(--safe-zone), #006688);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  white-space: nowrap;
+}
+
+.manual-location-search-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 15px rgba(0, 170, 255, 0.4);
+}
+
+.manual-location-search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.manual-location-error {
+  font-size: 0.7rem;
+  color: var(--blood-red);
+  display: none;
+  margin-bottom: 8px;
+  font-family: 'Poppins', sans-serif;
+}
+
+.manual-location-results {
+  margin-bottom: 12px;
+  min-height: 20px;
+}
+
+.manual-location-loading,
+.manual-location-no-results {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: 'Poppins', sans-serif;
+  padding: 8px;
+}
+
+.manual-location-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(0, 170, 255, 0.06);
+  border: 1px solid rgba(0, 170, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+}
+
+.manual-location-result:hover {
+  background: rgba(0, 170, 255, 0.12);
+  border-color: var(--safe-zone);
+  transform: scale(1.02);
+}
+
+.manual-location-result-icon {
+  font-size: 1.3rem;
+  flex-shrink: 0;
+}
+
+.manual-location-result-info {
+  min-width: 0;
+}
+
+.manual-location-result-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--white);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manual-location-result-coords {
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.4);
+  font-family: monospace;
+}
+
+.manual-location-buttons {
+  margin-top: 4px;
+}
+
+.manual-location-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  letter-spacing: 0.05em;
+}
+
+.manual-location-back {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.manual-location-back:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--white);
+}
+
 /* ── Notification ── */
 .hud-notification {
   position: fixed;
