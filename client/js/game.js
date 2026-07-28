@@ -133,7 +133,8 @@ class Game {
           );
 
           if (!confirmed) {
-            // User said "No, try again" — retry the whole GPS process
+            // User said "No, try again" — reset progress and retry GPS
+            this.loadingProgress = 1;
             continue;
           }
 
