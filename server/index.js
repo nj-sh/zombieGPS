@@ -2,9 +2,15 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { config } from './config.js';
 import { initDatabase } from './supabase.js';
 import { setupSocketHandlers } from './socket-handlers.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const clientDir = path.resolve(__dirname, '../client');
 
 const app = express();
 const httpServer = createServer(app);
@@ -21,8 +27,8 @@ const io = new Server(httpServer, {
 app.use(cors());
 app.use(express.json());
 
-// Serve static client files
-app.use(express.static('client'));
+// Serve static client files (absolute path for Render)
+app.use(express.static(clientDir));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -43,6 +49,18 @@ app.get('/api/stats', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Failed to get stats' });
   }
+});
+
+// Catch-all: serve index.html for any unmatched GET (SPA fallback)
+app.get('*', (req, res) => {
+  if (req.path.startsWith('/api/')) return;
+  res.sendFile(path.join(clientDir, 'index.html'));
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Server error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
 // Initialize and start
