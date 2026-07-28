@@ -29,8 +29,12 @@ class MapManager {
   /**
    * Initialize the Leaflet map.
    */
-  init(centerLat = 40.7128, centerLng = -74.0060) {
+  init(centerLat, centerLng) {
     if (this.isInitialized) return;
+    if (centerLat === undefined || centerLng === undefined) {
+      console.error('🗺️ map.init() requires GPS coordinates — cannot default to NYC');
+      return;
+    }
 
     this.currentCenter = [centerLat, centerLng];
 

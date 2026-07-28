@@ -137,10 +137,14 @@ export function setupSocketHandlers(io) {
           status: player.status,
         });
 
-        // Spawn initial items if needed (centered on this player's position)
+        // Spawn initial items if needed (centered on this player's real GPS position)
         if (gameItems.length === 0) {
-          const playerLat = player.latitude || latitude || 40.7128;
-          const playerLng = player.longitude || longitude || -74.0060;
+          const playerLat = player.latitude || latitude;
+          const playerLng = player.longitude || longitude;
+          if (playerLat === undefined || playerLng === undefined) {
+            console.error('Cannot spawn items: no GPS position from player');
+            return;
+          }
           gameItems = spawnItems(playerLat, playerLng);
           activeSafeZones = getSafeZonesNear(playerLat, playerLng);
           io.emit(SOCKET_EVENTS.ITEM_SPAWNED, { items: gameItems });
@@ -266,8 +270,9 @@ export function setupSocketHandlers(io) {
 
                   // Respawn new items + safe zones after a short delay
                   setTimeout(() => {
-                    const centerLat = activeSafeZones[0]?.latitude || 40.7128;
-                    const centerLng = activeSafeZones[0]?.longitude || -74.0060;
+                    const centerLat = activeSafeZones[0]?.latitude;
+                    const centerLng = activeSafeZones[0]?.longitude;
+                    if (centerLat === undefined || centerLng === undefined) return;
                     gameItems = spawnItems(centerLat, centerLng);
                     activeSafeZones = getSafeZonesNear(centerLat, centerLng);
                     io.emit(SOCKET_EVENTS.ITEM_SPAWNED, { items: gameItems });

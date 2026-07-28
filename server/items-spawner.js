@@ -145,7 +145,11 @@ function spawnWorldItems(centerLat, centerLng) {
  * Spawn initial game items — both world-spawn and safe zone loot.
  * Items and safe zones are centered on the given position (player's GPS).
  */
-export function spawnItems(centerLat = 40.7128, centerLng = -74.0060) {
+export function spawnItems(centerLat, centerLng) {
+  if (centerLat === undefined || centerLng === undefined) {
+    console.error('spawnItems() requires GPS coordinates — cannot default to NYC');
+    return [];
+  }
   const items = [];
 
   // ── World-spawn items (food, medicine, mech parts, some health packs) ──
