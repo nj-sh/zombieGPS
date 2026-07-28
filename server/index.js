@@ -53,7 +53,6 @@ app.get('/api/stats', async (req, res) => {
 
 // Catch-all: serve index.html for any unmatched GET (SPA fallback)
 app.get('*', (req, res) => {
-  if (req.path.startsWith('/api/')) return;
   res.sendFile(path.join(clientDir, 'index.html'));
 });
 
