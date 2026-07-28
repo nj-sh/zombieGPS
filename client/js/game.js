@@ -1080,18 +1080,26 @@ class Game {
         }
       };
 
-      // Search on button click
-      searchBtn.addEventListener('click', doSearch);
+      // Search on button click (with debounce to avoid Nominatim rate limiting)
+      let searchCooldown = false;
+      const doSearchWithCooldown = async () => {
+        if (searchCooldown || resolved) return;
+        searchCooldown = true;
+        setTimeout(() => { searchCooldown = false; }, 1200);
+        await doSearch();
+      };
+
+      searchBtn.addEventListener('click', doSearchWithCooldown);
 
       // Search on Enter key
       input.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
           e.preventDefault();
-          doSearch();
+          doSearchWithCooldown();
         }
       });
 
-      // Back button → cancel
+      // Back button → go back to GPS retry (which will show the error screen)
       backBtn.addEventListener('click', () => {
         if (resolved) return;
         cleanup();
