@@ -185,117 +185,133 @@
   animation: shake 0.5s ease-out;
 }
 
-/* ── Loading Screen ── */
+/* ── SIGNAL LOCK — Loading Screen ── */
 #loading-screen {
   position: fixed;
   top: 0; left: 0;
   width: 100%; height: 100%;
-  background: var(--black);
+  background: radial-gradient(ellipse at center, #0d0d0d 0%, var(--black) 100%);
   display: none;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   z-index: 2000;
+  gap: 24px;
+  padding: 20px;
 }
 
 #loading-screen.active {
   display: flex;
 }
 
-.loading-biohazard {
-  width: 60px;
-  height: 60px;
-  margin-bottom: 30px;
-  animation: spin 2s linear infinite;
+/* ── Signal Meter Ring ── */
+.signal-ring-container {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  animation: fade-in 0.8s ease;
 }
 
-.loading-biohazard svg {
+.signal-ring-svg {
   width: 100%;
   height: 100%;
+  filter: drop-shadow(0 0 20px rgba(255,255,255,0.05));
 }
 
-.loading-lines {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 30px;
-  width: 320px;
+/* Animated segments — each lights up when its level is reached */
+.signal-segment {
+  transition: opacity 0.6s ease, stroke 0.6s ease;
 }
 
-.loading-line {
-  font-family: monospace;
-  font-size: 0.85rem;
-  color: rgba(255, 255, 255, 0.6);
-  letter-spacing: 0.1em;
-  opacity: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.signal-segment.active {
+  opacity: 1 !important;
+  filter: drop-shadow(0 0 6px currentColor);
+  animation: signal-pulse 2s ease-in-out infinite;
 }
 
-.loading-line .loading-icon {
-  width: 20px;
+/* Center content inside the ring */
+.signal-ring-center {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
   text-align: center;
+  pointer-events: none;
 }
 
-.loading-line.active {
-  animation: loading-line-in 0.5s ease forwards;
+.signal-emoji {
+  font-size: 2rem;
+  margin-bottom: 4px;
+  transition: filter 0.5s ease;
 }
 
-.loading-line.done {
-  color: var(--neon-green);
+.signal-label {
+  font-family: var(--font-ui);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: rgba(255, 255, 255, 0.4);
+  transition: color 0.5s ease;
 }
 
-.loading-line.failed {
-  color: var(--blood-red);
+.signal-accuracy {
+  font-family: monospace;
+  font-size: 0.6rem;
+  color: rgba(255, 255, 255, 0.25);
+  margin-top: 2px;
+  transition: color 0.5s ease;
 }
 
-.loading-progress-container {
-  width: 320px;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.loading-progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--blood-red), var(--neon-green));
-  border-radius: 2px;
-  width: 0%;
-  transition: width 0.3s ease;
-}
-
-/* ── GPS Accuracy Indicator (during acquisition) ── */
-.gps-accuracy-container {
-  width: 320px;
-  margin-top: 12px;
+/* ── Hint Text ── */
+.signal-hint {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.5);
+  text-align: center;
+  max-width: 300px;
+  line-height: 1.5;
   animation: fade-in 0.5s ease;
+  min-height: 2.4rem;
+  transition: color 0.5s ease;
 }
 
-.gps-accuracy-bar-track {
-  width: 100%;
-  height: 4px;
-  background: rgba(255, 255, 255, 0.08);
-  border-radius: 2px;
-  overflow: hidden;
-  margin-bottom: 6px;
+/* ── Background Task Status ── */
+.signal-tasks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  max-width: 340px;
+  animation: fade-in 0.8s ease;
 }
 
-.gps-accuracy-bar-fill {
-  height: 100%;
-  width: 0%;
-  border-radius: 2px;
-  transition: width 0.3s ease, background 0.3s ease, box-shadow 0.3s ease;
-}
-
-.gps-accuracy-text {
+.signal-task {
   font-family: monospace;
   font-size: 0.65rem;
-  color: rgba(255, 255, 255, 0.4);
-  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
   letter-spacing: 0.05em;
-  transition: color 0.3s ease;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.4s ease;
+}
+
+.signal-task.active {
+  color: rgba(255, 255, 255, 0.6);
+  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.signal-task.done {
+  color: var(--neon-green);
+  border-color: rgba(57, 255, 20, 0.2);
+  background: rgba(57, 255, 20, 0.05);
+}
+
+.signal-task.failed {
+  color: var(--blood-red);
+  border-color: rgba(193, 18, 31, 0.2);
+  background: rgba(193, 18, 31, 0.05);
 }
 
 /* ── Location Confirmation Dialog ── */

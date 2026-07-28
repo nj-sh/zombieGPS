@@ -103,61 +103,43 @@
     </div>
 
     <!-- ════════════════════════════════════════════════════════
-         LOADING SCREEN
+         SIGNAL LOCK — Loading Screen
+         ── The player must achieve good GPS signal to "escape" ──
          ════════════════════════════════════════════════════════ -->
     <div id="loading-screen">
-      <div class="loading-biohazard">
-        <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <!-- Biohazard symbol (simplified) -->
-          <circle cx="50" cy="50" r="8" fill="#c1121f"/>
-          <path d="M50 42 C50 42, 58 30, 70 28 C80 26, 85 32, 85 32"
-                stroke="#c1121f" stroke-width="3" fill="none"/>
-          <path d="M50 42 C50 42, 30 30, 30 28 C20 26, 15 32, 15 32"
-                stroke="#c1121f" stroke-width="3" fill="none"/>
-          <path d="M50 58 C50 58, 42 70, 30 72 C20 74, 15 68, 15 68"
-                stroke="#c1121f" stroke-width="3" fill="none"/>
-          <path d="M50 58 C50 58, 58 70, 70 72 C80 74, 85 68, 85 68"
-                stroke="#c1121f" stroke-width="3" fill="none"/>
+
+      <!-- Signal Meter Ring -->
+      <div class="signal-ring-container" id="signal-ring-container">
+        <svg class="signal-ring-svg" viewBox="0 0 200 200">
+          <!-- Background ring -->
+          <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+          <!-- Signal segments (4 bars showing signal strength, bottom-left to top-left) -->
+          <!-- Level 1 (None): bottom-left arc -->
+          <path class="signal-segment" id="sig-l1" d="M 50 170 A 88 88 0 0 1 30 100" fill="none" stroke="#c1121f" stroke-width="6" stroke-linecap="round" opacity="0.15"/>
+          <!-- Level 2 (Weak): left arc -->
+          <path class="signal-segment" id="sig-l2" d="M 30 100 A 88 88 0 0 1 50 30" fill="none" stroke="#ff8800" stroke-width="6" stroke-linecap="round" opacity="0.15"/>
+          <!-- Level 3 (Good): top arc -->
+          <path class="signal-segment" id="sig-l3" d="M 50 30 A 88 88 0 0 1 150 30" fill="none" stroke="#ffdd00" stroke-width="6" stroke-linecap="round" opacity="0.15"/>
+          <!-- Level 4 (Excellent): top-right arc -->
+          <path class="signal-segment" id="sig-l4" d="M 150 30 A 88 88 0 0 1 170 100" fill="none" stroke="#39ff14" stroke-width="6" stroke-linecap="round" opacity="0.15"/>
         </svg>
-      </div>
-
-      <div class="loading-lines">
-        <div class="loading-line" data-default-text="Initializing Engine...">
-          <span class="loading-icon">☣</span>
-          <span class="loading-text">Initializing Engine...</span>
-        </div>
-        <div class="loading-line" data-default-text="Requesting GPS Permission...">
-          <span class="loading-icon">📍</span>
-          <span class="loading-text">Requesting GPS Permission...</span>
-        </div>
-        <div class="loading-line" data-default-text="Connecting to Server...">
-          <span class="loading-icon">🔌</span>
-          <span class="loading-text">Connecting to Server...</span>
-        </div>
-        <div class="loading-line" data-default-text="Downloading Survivor Data...">
-          <span class="loading-icon">💾</span>
-          <span class="loading-text">Downloading Survivor Data...</span>
-        </div>
-        <div class="loading-line" data-default-text="Loading World...">
-          <span class="loading-icon">🗺️</span>
-          <span class="loading-text">Loading World...</span>
-        </div>
-        <div class="loading-line" data-default-text="Entering Outbreak...">
-          <span class="loading-icon">☣</span>
-          <span class="loading-text">Entering Outbreak...</span>
+        <!-- Center content inside the ring -->
+        <div class="signal-ring-center">
+          <div class="signal-emoji" id="signal-emoji">📡</div>
+          <div class="signal-label" id="signal-label">SEARCHING</div>
+          <div class="signal-accuracy" id="signal-accuracy">-- m</div>
         </div>
       </div>
 
-      <div class="loading-progress-container">
-        <div class="loading-progress-fill" id="loading-progress-fill"></div>
-      </div>
+      <!-- Hint text (moves based on signal level) -->
+      <div class="signal-hint" id="signal-hint">Searching for GPS satellites...</div>
 
-      <!-- GPS Signal Accuracy Indicator (live during acquisition) -->
-      <div class="gps-accuracy-container" id="gps-accuracy-container">
-        <div class="gps-accuracy-bar-track">
-          <div class="gps-accuracy-bar-fill" id="gps-accuracy-bar"></div>
-        </div>
-        <div class="gps-accuracy-text" id="gps-accuracy-text">⏳ Searching for signal...</div>
+      <!-- Background task status -->
+      <div class="signal-tasks" id="signal-tasks">
+        <div class="signal-task done" id="stask-engine">☣ Engine ✓</div>
+        <div class="signal-task" id="stask-gps">📍 GPS signal...</div>
+        <div class="signal-task" id="stask-server">🔌 Server...</div>
+        <div class="signal-task" id="stask-map">🗺️ Map...</div>
       </div>
 
       <!-- Location Confirmation Dialog (shown after GPS lock) -->

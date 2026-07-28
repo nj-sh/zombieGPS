@@ -78,6 +78,8 @@ class Game {
 
   /**
    * Start the game after menu submission.
+   * Shows the SIGNAL LOCK screen — player must achieve good GPS
+   * signal strength to "escape" the loading screen and enter the game.
    */
   async startGame(playerData) {
     this.state = 'loading';
@@ -85,207 +87,131 @@ class Game {
     this.showLoadingScreen();
 
     try {
-      // Step 1: Initialize engine
-      await this.loadingStep('Initializing Engine...');
+      // Step 1: Engine initialized
+      this.updateSignalTask('engine', 'done');
 
-      // Register GPS update listener ONCE (before acquisition to capture all updates)
+      // Register GPS update listener (for live gameplay position updates)
       window.gps.on('position', (data) => {
         this.handlePositionUpdate(data);
       });
 
-      // Store acquisition listener reference for cleanup on retry
-      this._onAcquisitionUpdate = null;
-
-      // Step 2: Acquire position — continuous watchPosition with accuracy improvement
+      // ── SIGNAL GATE: Acquire GPS with live signal meter ──
+      // The player watches the signal ring fill up as GPS accuracy improves.
+      // When signal hits "Good" (≤100m stable), or when fallback is used,
+      // the game proceeds. No confirmation dialog needed — signal IS the gate.
       let gpsPos;
-      let locationSource = 'gps';
-      while (true) {
-        try {
-          gpsPos = await this.loadingStep('Searching for GPS signal...', async () => {
-            // ── Phase 1: Use watchPosition-based acquisition ──
-            // This fires a continuous watch, waits for accuracy to improve,
-            // applies jitter filtering, and resolves when ready.
+      this.updateSignalTask('gps', 'active');
 
-            // Listen for live accuracy updates during acquisition
-            // Store reference so we can clean it up on retry
-            this._onAcquisitionUpdate = (data) => {
-              if (data.accuracy) {
-                // Update the loading line text to show live accuracy
-                const lines = document.querySelectorAll('.loading-line');
-                const currentLine = lines[this.loadingProgress];
-                if (currentLine) {
-                  const textEl = currentLine.querySelector('.loading-text');
-                  if (textEl) {
-                    const quality = window.gps.getSignalQualityIndicator();
-                    textEl.textContent = `GPS: ${quality.emoji} ${quality.label} (${Math.round(data.accuracy)}m)`;
-                  }
-                }
-                // Update the accuracy indicator bar
-                this.updateGPSAccuracyBar(data.accuracy, data.signalQuality);
-              }
-            };
+      // Listen for live acquisition updates → drives the signal meter
+      this._onAcquisitionUpdate = (data) => {
+        this.updateSignalMeter(data);
+      };
+      window.gps.on('acquisition_update', this._onAcquisitionUpdate);
 
-            window.gps.on('acquisition_update', this._onAcquisitionUpdate);
+      try {
+        // Try GPS first
+        gpsPos = await window.gps.acquirePosition();
+        this.updateSignalTask('gps', 'done');
+      } catch (gpsErr) {
+        // GPS failed — show on meter
+        this.updateSignalMeter({ error: true, errorCode: gpsErr.code });
+        this.updateSignalTask('gps', 'failed');
 
-            try {
-              const pos = await window.gps.acquirePosition();
-              // GPS success! Clean up the acquisition listener
-              window.gps.off('acquisition_update', this._onAcquisitionUpdate);
-              this._onAcquisitionUpdate = null;
-              return pos;
-            } catch (gpsErr) {
-              window.gps.off('acquisition_update', this._onAcquisitionUpdate);
-              this._onAcquisitionUpdate = null;
-
-              // Handle specific GPS errors with clear messages
-              if (gpsErr.code === 'GPS_DENIED' || gpsErr.code === 'GPS_TIMEOUT' || gpsErr.code === 'GPS_UNAVAILABLE') {
-                console.log(`📍 GPS ${gpsErr.code}, trying IP geolocation...`);
-                // Don't throw — fall through to Phase 2
-              } else {
-                throw gpsErr; // Unknown error — propagate
-              }
-
-              // ── Phase 2: GPS failed — try IP geolocation as fallback ──
-              console.log('📍 Falling back to IP geolocation...');
-              const ipPos = await this.getIPLocation();
-              if (ipPos) {
-                window.gps.setPosition(ipPos.latitude, ipPos.longitude, ipPos.accuracy || 5000);
-                return { ...ipPos, isIPBased: true };
-              }
-
-              // ── Phase 3: Both GPS and IP failed — ask user to type their location ──
-              console.log('📍 GPS + IP both failed, asking for manual location...');
-              const manualPos = await this.showManualLocationDialog();
-              if (manualPos) {
-                window.gps.setPosition(manualPos.latitude, manualPos.longitude, manualPos.accuracy || 5000);
-                return { ...manualPos, isIPBased: true };
-              }
-
-              // User cancelled manual entry too
-              throw new Error('Could not determine your location. Make sure location services are enabled and try again.');
-            }
-          });
-
-          // Remember source for confirmation dialog
-          locationSource = gpsPos.isIPBased ? 'ip' : 'gps';
-
-          // Confirm location with user (no loadingStep, to avoid progress corruption on retry)
-          const placeName = await this.doReverseGeocode(
-            gpsPos.latitude,
-            gpsPos.longitude
-          );
-          const confirmed = await this.showLocationConfirm(
-            placeName,
-            gpsPos.latitude,
-            gpsPos.longitude,
-            gpsPos.accuracy,
-            locationSource
-          );
-
-          if (!confirmed) {
-            // User said "No, try again" — reset progress and retry
-            this.loadingProgress = 1;
-            continue;
+        // Fallback: IP geolocation
+        console.log('📍 GPS failed, trying IP geolocation...');
+        const ipPos = await this.getIPLocation();
+        if (ipPos) {
+          window.gps.setPosition(ipPos.latitude, ipPos.longitude, ipPos.accuracy || 5000);
+          gpsPos = { ...ipPos, isIPBased: true };
+          this.updateSignalTask('gps', 'done');
+        } else {
+          // Fallback: Manual location entry
+          console.log('📍 IP failed, asking for manual location...');
+          const manualPos = await this.showManualLocationDialog();
+          if (manualPos) {
+            window.gps.setPosition(manualPos.latitude, manualPos.longitude, manualPos.accuracy || 5000);
+            gpsPos = { ...manualPos, isIPBased: true };
+            this.updateSignalTask('gps', 'done');
+          } else {
+            throw new Error('Could not determine your location.');
           }
-
-          // User confirmed — break out
-          break;
-        } catch (err) {
-          if (err.message === 'RETRY_GPS') {
-            console.log('📍 User rejected location, retrying...');
-            continue;
-          }
-          throw err;
         }
       }
 
-      // Step 3: Connect to server
-      await this.loadingStep('Connecting to Server...', async () => {
-        return new Promise((resolve) => {
-          window.socketManager.connect();
+      // Cleanup acquisition listener
+      window.gps.off('acquisition_update', this._onAcquisitionUpdate);
+      this._onAcquisitionUpdate = null;
 
-          window.socketManager.on('connect', () => {
-            resolve();
-          });
+      // ── Phase 2: Connect to server + join game ──
+      this.updateSignalTask('server', 'active');
 
-          setTimeout(() => {
-            console.warn('Server connection timeout, continuing in offline mode');
-            resolve();
-          }, 5000);
+      window.socketManager.connect();
+      await new Promise((resolve) => {
+        window.socketManager.on('connect', () => resolve());
+        setTimeout(() => {
+          console.warn('Server connection timeout, continuing in offline mode');
+          resolve();
+        }, 5000);
+      });
+
+      // Join game with our acquired position
+      const gpsData = window.gps.getPositionData();
+      window.socketManager.joinGame({
+        name: playerData.name,
+        team: playerData.team,
+        latitude: gpsData.latitude,
+        longitude: gpsData.longitude,
+      });
+
+      this.setupSocketListeners();
+
+      await new Promise((resolve) => {
+        const timeout = setTimeout(resolve, 3000);
+        window.socketManager.on('game_state', (data) => {
+          clearTimeout(timeout);
+          this.handleGameState(data);
+          resolve();
         });
       });
 
-      // Step 4: Download survivor data
-      await this.loadingStep('Downloading Survivor Data...', async () => {
-        const gpsData = window.gps.getPositionData();
-        window.socketManager.joinGame({
-          name: playerData.name,
-          team: playerData.team,
-          latitude: gpsData.latitude,
-          longitude: gpsData.longitude,
-        });
+      this.updateSignalTask('server', 'done');
 
-        this.setupSocketListeners();
+      // ── Phase 3: Load map ──
+      this.updateSignalTask('map', 'active');
 
-        await new Promise((resolve) => {
-          const timeout = setTimeout(resolve, 3000);
-          window.socketManager.on('game_state', (data) => {
-            clearTimeout(timeout);
-            this.handleGameState(data);
-            resolve();
-          });
-        });
-      });
+      window.mapManager.init(gpsData.latitude, gpsData.longitude);
+      this.renderAllPlayersToMap();
 
-      // Step 5: Load world
-      await this.loadingStep('Loading World...', async () => {
-        const gpsData = window.gps.getPositionData();
-        window.mapManager.init(gpsData.latitude, gpsData.longitude);
+      this.updateSignalTask('map', 'done');
 
-        // Now the player renderer exists — render the local player + all known players
-        this.renderAllPlayersToMap();
-      });
+      // ── Phase 4: Enter game! ──
+      window.mapManager.show();
+      window.hud.init();
+      window.hud.show();
 
-      // Step 6: Enter outbreak!
-      await this.loadingStep('Entering Outbreak...', async () => {
-        window.mapManager.show();
-        window.hud.init();
-        window.hud.show();
+      if (this.player) {
+        window.hud.updatePlayerInfo(this.player);
+      }
+      this.updateOnlineCount();
+      this.updateInventoryUI();
 
-        // Update player info now that HUD elements exist
-        if (this.player) {
-          window.hud.updatePlayerInfo(this.player);
+      await window.deviceOrientation.requestPermission();
+      window.deviceOrientation.start();
+
+      window.deviceOrientation.on('heading', (data) => {
+        window.hud.updateCompass(data.heading);
+        if (window.playerRenderer && this.player) {
+          window.playerRenderer.updatePlayerHeading(this.player.id, data.heading);
         }
-
-        // Re-render HUD counts after init
-        this.updateOnlineCount();
-
-        // Update inventory UI now that HUD elements exist
-        this.updateInventoryUI();
-
-        await window.deviceOrientation.requestPermission();
-        window.deviceOrientation.start();
-
-        window.deviceOrientation.on('heading', (data) => {
-          window.hud.updateCompass(data.heading);
-          if (window.playerRenderer && this.player) {
-            window.playerRenderer.updatePlayerHeading(this.player.id, data.heading);
-          }
-        });
-
-        return true;
       });
 
+      // ── Fully entered! ──
       this.state = 'playing';
       this.hideLoadingScreen();
       this.startSurvivalTimer();
-      // GPS watch is already running from acquirePosition() in Step 2
-      // No need to call window.gps.startWatching() again
 
-      // Initial reverse geocode
+      // Initial reverse geocode + periodic refresh
       this.doReverseGeocode();
-
-      // Periodic reverse geocode every 30s
       this._geocodeInterval = setInterval(() => this.doReverseGeocode(), 30000);
 
       console.log('☣ Entered outbreak!');
@@ -297,64 +223,13 @@ class Game {
   }
 
   /**
-   * Show loading screen with sequential steps.
+   * Show the SIGNAL LOCK loading screen.
    */
   showLoadingScreen() {
     const screen = document.getElementById('loading-screen');
     screen.classList.add('active');
-    this.loadingProgress = 0;
-    document.getElementById('loading-progress-fill').style.width = '0%';
-
-    document.querySelectorAll('.loading-line').forEach(line => {
-      line.classList.remove('active', 'done', 'failed');
-      const textEl = line.querySelector('.loading-text');
-      if (textEl) textEl.textContent = line.dataset.defaultText || '';
-    });
-  }
-
-  /**
-   * Execute a loading step with animated line.
-   */
-  async loadingStep(text, action) {
-    const lines = document.querySelectorAll('.loading-line');
-    const currentLine = lines[this.loadingProgress];
-
-    if (currentLine) {
-      const textEl = currentLine.querySelector('.loading-text');
-      const iconEl = currentLine.querySelector('.loading-icon');
-      if (textEl) textEl.textContent = text;
-      currentLine.classList.add('active');
-    }
-
-    const progress = ((this.loadingProgress + 1) / 6) * 100;
-    document.getElementById('loading-progress-fill').style.width = `${progress}%`;
-
-    let result;
-    try {
-      if (action) {
-        result = await action();
-      } else {
-        await new Promise(r => setTimeout(r, 800));
-      }
-
-      if (currentLine) {
-        currentLine.classList.add('done');
-        currentLine.classList.remove('active');
-        const iconEl = currentLine.querySelector('.loading-icon');
-        if (iconEl) iconEl.textContent = '✓';
-      }
-    } catch (err) {
-      if (currentLine) {
-        currentLine.classList.add('failed');
-        currentLine.classList.remove('active');
-        const iconEl = currentLine.querySelector('.loading-icon');
-        if (iconEl) iconEl.textContent = '✗';
-      }
-      throw err;
-    }
-
-    this.loadingProgress++;
-    return result;
+    // Reset signal meter to initial state
+    this.updateSignalMeter({ accuracy: null, signalQuality: 'unknown' });
   }
 
   /**
@@ -371,27 +246,116 @@ class Game {
   }
 
   /**
-   * Update the GPS accuracy indicator on the loading screen.
-   * Shows real-time accuracy and signal quality during acquisition.
+   * Update a background task pill badge (engine, gps, server, map).
+   * @param {string} task - 'engine' | 'gps' | 'server' | 'map'
+   * @param {string} status - 'active' | 'done' | 'failed'
    */
-  updateGPSAccuracyBar(accuracy, signalQuality) {
-    const bar = document.getElementById('gps-accuracy-bar');
-    const text = document.getElementById('gps-accuracy-text');
-    if (!bar || !text) return;
+  updateSignalTask(task, status) {
+    const el = document.getElementById(`stask-${task}`);
+    if (!el) return;
+    // Remove all status classes
+    el.classList.remove('active', 'done', 'failed');
+    if (status) {
+      el.classList.add(status);
+    }
+  }
 
-    const quality = window.gps.getSignalQualityIndicator();
+  /**
+   * Update the signal meter ring based on GPS acquisition data.
+   * Lights up ring segments as signal improves, changes hint text.
+   *
+   * Signal levels:
+   *   Level 1 (🔴 None,    >500m): "Move to an open area..."
+   *   Level 2 (🟠 Weak,    ≤500m): "Signal detected, moving..."
+   *   Level 3 (🟡 Good,    ≤100m): "Signal locked! Entering..." ← entry gate
+   *   Level 4 (🟢 Excellent, ≤30m): "Perfect signal!"
+   */
+  updateSignalMeter(data) {
+    const seg1 = document.getElementById('sig-l1');
+    const seg2 = document.getElementById('sig-l2');
+    const seg3 = document.getElementById('sig-l3');
+    const seg4 = document.getElementById('sig-l4');
+    const emoji = document.getElementById('signal-emoji');
+    const label = document.getElementById('signal-label');
+    const accuracyEl = document.getElementById('signal-accuracy');
+    const hint = document.getElementById('signal-hint');
 
-    // Update the bar width (inverse: lower accuracy = more filled)
-    // Cap at 100m for the bar — beyond that looks the same
-    const displayAccuracy = Math.min(100, accuracy);
-    const barPercent = 100 - displayAccuracy;
-    bar.style.width = `${barPercent}%`;
-    bar.style.background = quality.color;
-    bar.style.boxShadow = `0 0 8px ${quality.color}`;
+    if (!seg1) return;
 
-    // Update the text
-    text.textContent = `${quality.emoji} ${quality.label} — ${Math.round(accuracy)}m accuracy`;
-    text.style.color = quality.color;
+    // Handle error state
+    if (data.error) {
+      if (data.errorCode === 'GPS_DENIED') {
+        this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 0,
+          '🔕', 'DENIED', '--', 'GPS permission denied. Using approximate location...');
+      } else {
+        this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 0,
+          '📡', 'NO SIGNAL', '--', 'Searching for GPS...');
+      }
+      return;
+    }
+
+    const accuracy = data.accuracy;
+
+    if (!accuracy && accuracy !== 0) {
+      // No accuracy yet — initial searching state
+      this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 0,
+        '📡', 'SEARCHING', '--', 'Searching for GPS satellites...');
+      return;
+    }
+
+    // Determine signal level and update UI
+    if (accuracy <= 30) {
+      // Excellent (Level 4): street-level precision
+      this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 4,
+        '🟢', 'EXCELLENT', `${Math.round(accuracy)}m`, 'Perfect signal! Entering the outbreak...');
+    } else if (accuracy <= 100) {
+      // Good (Level 3): playable
+      this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 3,
+        '🟡', 'GOOD', `${Math.round(accuracy)}m`, 'Signal locked! Preparing to deploy...');
+    } else if (accuracy <= 500) {
+      // Weak (Level 2): rough position
+      this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 2,
+        '🟠', 'WEAK', `${Math.round(accuracy)}m`, 'Signal is weak — try moving near a window or going outside.');
+    } else {
+      // None (Level 1): no real fix
+      this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 1,
+        '🔴', 'NO SIGNAL', `${Math.round(accuracy)}m`, 'Move to an open area with clear sky view for better reception.');
+    }
+  }
+
+  /**
+   * Helper to set the signal ring segments and UI text.
+   * @param {number} level - 0-4, how many segments to light up
+   */
+  setSignalLevel(emoji, label, accuracyEl, hint, s1, s2, s3, s4, level, emojiText, labelText, accuracyText, hintText) {
+    if (emoji) emoji.textContent = emojiText;
+    if (label) {
+      label.textContent = labelText;
+      // Color the label based on level
+      const colors = ['rgba(255,255,255,0.4)', 'var(--blood-red)', '#ff8800', '#ffdd00', 'var(--neon-green)'];
+      label.style.color = colors[level] || colors[0];
+    }
+    if (accuracyEl) {
+      accuracyEl.textContent = accuracyText;
+      const colors = ['rgba(255,255,255,0.25)', 'var(--blood-red)', '#ff8800', '#ffdd00', 'var(--neon-green)'];
+      accuracyEl.style.color = colors[level] || colors[0];
+    }
+    if (hint) {
+      hint.textContent = hintText;
+      const colors = ['rgba(255,255,255,0.5)', 'var(--blood-red)', '#ff8800', '#ffdd00', 'var(--neon-green)'];
+      hint.style.color = colors[level] || colors[0];
+    }
+
+    // Light up segments: level N means first N segments are active
+    [s1, s2, s3, s4].forEach((seg, i) => {
+      if (seg) {
+        if (i < level) {
+          seg.classList.add('active');
+        } else {
+          seg.classList.remove('active');
+        }
+      }
+    });
   }
 
   /**
