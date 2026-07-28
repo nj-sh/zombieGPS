@@ -321,6 +321,10 @@ class Game {
       this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 1,
         '🔴', 'NO SIGNAL', `${Math.round(accuracy)}m`, 'Move to an open area with clear sky view for better reception.');
     }
+
+    // Fire-and-forget reverse geocode to show place name on signal lock screen
+    // doReverseGeocode() has built-in rate limiting and caching
+    this.updateSignalPlace();
   }
 
   /**
@@ -890,6 +894,11 @@ class Game {
 
       this._lastGeocodeName = result;
       window.hud.updateLocation(result);
+      // Also update the signal lock screen place name if visible
+      const signalPlace = document.getElementById('signal-place');
+      if (signalPlace) {
+        signalPlace.textContent = `📍 ${result}`;
+      }
       return result;
     } catch (err) {
       console.warn('Geocode error:', err);
@@ -927,6 +936,31 @@ class Game {
       console.warn('IP geolocation failed:', err);
       return null;
     }
+  }
+
+  /**
+   * Update the place name shown on the signal lock screen.
+   * Fires a reverse geocode request to find the current location name.
+   * The geocode method handles rate limiting and caching internally.
+   */
+  updateSignalPlace() {
+    const placeEl = document.getElementById('signal-place');
+    if (!placeEl) return;
+
+    // If we already have a cached name from doReverseGeocode, show it immediately
+    if (this._lastGeocodeName) {
+      placeEl.textContent = `📍 ${this._lastGeocodeName}`;
+      return;
+    }
+
+    // Fire-and-forget the geocode request
+    this.doReverseGeocode().then((name) => {
+      if (name && name !== 'Unknown area') {
+        placeEl.textContent = `📍 ${name}`;
+      }
+    }).catch(() => {
+      // Silently fail — placeholder text stays
+    });
   }
 
   /**
