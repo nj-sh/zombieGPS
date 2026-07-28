@@ -95,52 +95,14 @@ class Game {
         this.handlePositionUpdate(data);
       });
 
-      // ── SIGNAL GATE: Acquire GPS with live signal meter ──
-      // The player watches the signal ring fill up as GPS accuracy improves.
-      // When signal hits "Good" (≤100m stable), or when fallback is used,
-      // the game proceeds. No confirmation dialog needed — signal IS the gate.
-      let gpsPos;
-      this.updateSignalTask('gps', 'active');
+      // ── LOCATION PICKER: Tap the map to set your location ──
+      // Instead of struggling with GPS, the user browses the map
+      // and taps where they are. GPS will still track movement
+      // once the game starts.
+      const pickedPos = await this.showLocationPicker();
 
-      // Listen for live acquisition updates → drives the signal meter
-      this._onAcquisitionUpdate = (data) => {
-        this.updateSignalMeter(data);
-      };
-      window.gps.on('acquisition_update', this._onAcquisitionUpdate);
-
-      try {
-        // Try GPS first
-        gpsPos = await window.gps.acquirePosition();
-        this.updateSignalTask('gps', 'done');
-      } catch (gpsErr) {
-        // GPS failed — show on meter
-        this.updateSignalMeter({ error: true, errorCode: gpsErr.code });
-        this.updateSignalTask('gps', 'failed');
-
-        // Fallback: IP geolocation
-        console.log('📍 GPS failed, trying IP geolocation...');
-        const ipPos = await this.getIPLocation();
-        if (ipPos) {
-          window.gps.setPosition(ipPos.latitude, ipPos.longitude, ipPos.accuracy || 5000);
-          gpsPos = { ...ipPos, isIPBased: true };
-          this.updateSignalTask('gps', 'done');
-        } else {
-          // Fallback: Manual location entry
-          console.log('📍 IP failed, asking for manual location...');
-          const manualPos = await this.showManualLocationDialog();
-          if (manualPos) {
-            window.gps.setPosition(manualPos.latitude, manualPos.longitude, manualPos.accuracy || 5000);
-            gpsPos = { ...manualPos, isIPBased: true };
-            this.updateSignalTask('gps', 'done');
-          } else {
-            throw new Error('Could not determine your location.');
-          }
-        }
-      }
-
-      // Cleanup acquisition listener
-      window.gps.off('acquisition_update', this._onAcquisitionUpdate);
-      this._onAcquisitionUpdate = null;
+      // Store the picked position in GPS tracker
+      window.gps.setPosition(pickedPos.latitude, pickedPos.longitude, pickedPos.accuracy || 50);
 
       // ── Phase 2: Connect to server + join game ──
       this.updateSignalTask('server', 'active');
@@ -228,8 +190,6 @@ class Game {
   showLoadingScreen() {
     const screen = document.getElementById('loading-screen');
     screen.classList.add('active');
-    // Reset signal meter to initial state
-    this.updateSignalMeter({ accuracy: null, signalQuality: 'unknown' });
   }
 
   /**
@@ -261,104 +221,134 @@ class Game {
   }
 
   /**
-   * Update the signal meter ring based on GPS acquisition data.
-   * Lights up ring segments as signal improves, changes hint text.
-   *
-   * Signal levels:
-   *   Level 1 (🔴 None,    >500m): "Move to an open area..."
-   *   Level 2 (🟠 Weak,    ≤500m): "Signal detected, moving..."
-   *   Level 3 (🟡 Good,    ≤100m): "Signal locked! Entering..." ← entry gate
-   *   Level 4 (🟢 Excellent, ≤30m): "Perfect signal!"
+   * Show the location picker — a full-screen Leaflet map where the
+   * user taps to set their starting location.
+   * @returns {Promise<{latitude: number, longitude: number, accuracy: number}>}
    */
-  updateSignalMeter(data) {
-    const seg1 = document.getElementById('sig-l1');
-    const seg2 = document.getElementById('sig-l2');
-    const seg3 = document.getElementById('sig-l3');
-    const seg4 = document.getElementById('sig-l4');
-    const emoji = document.getElementById('signal-emoji');
-    const label = document.getElementById('signal-label');
-    const accuracyEl = document.getElementById('signal-accuracy');
-    const hint = document.getElementById('signal-hint');
+  showLocationPicker() {
+    return new Promise((resolve) => {
+      const screen = document.getElementById('loading-screen');
+      screen.classList.add('active');
 
-    if (!seg1) return;
+      const mapEl = document.getElementById('pick-map');
+      const panel = document.getElementById('pick-panel');
+      const placeNameEl = document.getElementById('pick-place-name');
+      const coordsEl = document.getElementById('pick-coords');
+      const deployBtn = document.getElementById('pick-btn-deploy');
+      const gpsBtn = document.getElementById('pick-btn-gps');
+      const header = document.getElementById('pick-header');
+      const crosshair = document.getElementById('pick-crosshair');
+      const tasks = document.getElementById('pick-tasks');
 
-    // Handle error state
-    if (data.error) {
-      if (data.errorCode === 'GPS_DENIED') {
-        this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 0,
-          '🔕', 'DENIED', '--', 'GPS permission denied. Using approximate location...');
-      } else {
-        this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 0,
-          '📡', 'NO SIGNAL', '--', 'Searching for GPS...');
-      }
-      return;
-    }
+      let chosenLat = null, chosenLng = null;
+      let marker = null;
+      let resolved = false;
 
-    const accuracy = data.accuracy;
+      // Init Leaflet map at world view
+      const map = L.map(mapEl, {
+        zoomControl: false,
+        attributionControl: false,
+        center: [20, 0],
+        zoom: 2,
+        worldCopyJump: true,
+      });
 
-    if (!accuracy && accuracy !== 0) {
-      // No accuracy yet — initial searching state
-      this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 0,
-        '📡', 'SEARCHING', '--', 'Searching for GPS satellites...');
-      return;
-    }
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        noWrap: false,
+      }).addTo(map);
 
-    // Determine signal level and update UI
-    if (accuracy <= 30) {
-      // Excellent (Level 4): street-level precision
-      this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 4,
-        '🟢', 'EXCELLENT', `${Math.round(accuracy)}m`, 'Perfect signal! Entering the outbreak...');
-    } else if (accuracy <= 100) {
-      // Good (Level 3): playable
-      this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 3,
-        '🟡', 'GOOD', `${Math.round(accuracy)}m`, 'Signal locked! Preparing to deploy...');
-    } else if (accuracy <= 500) {
-      // Weak (Level 2): rough position
-      this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 2,
-        '🟠', 'WEAK', `${Math.round(accuracy)}m`, 'Signal is weak — try moving near a window or going outside.');
-    } else {
-      // None (Level 1): no real fix
-      this.setSignalLevel(emoji, label, accuracyEl, hint, seg1, seg2, seg3, seg4, 1,
-        '🔴', 'NO SIGNAL', `${Math.round(accuracy)}m`, 'Move to an open area with clear sky view for better reception.');
-    }
+      // Ensure the map fills the container
+      setTimeout(() => map.invalidateSize(), 100);
 
-    // Fire-and-forget reverse geocode to show place name on signal lock screen
-    // doReverseGeocode() has built-in rate limiting and caching
-    this.updateSignalPlace();
-  }
+      // ── Click handler — place pin ──
+      map.on('click', async (e) => {
+        if (resolved) return;
+        chosenLat = e.latlng.lat;
+        chosenLng = e.latlng.lng;
 
-  /**
-   * Helper to set the signal ring segments and UI text.
-   * @param {number} level - 0-4, how many segments to light up
-   */
-  setSignalLevel(emoji, label, accuracyEl, hint, s1, s2, s3, s4, level, emojiText, labelText, accuracyText, hintText) {
-    if (emoji) emoji.textContent = emojiText;
-    if (label) {
-      label.textContent = labelText;
-      // Color the label based on level
-      const colors = ['rgba(255,255,255,0.4)', 'var(--blood-red)', '#ff8800', '#ffdd00', 'var(--neon-green)'];
-      label.style.color = colors[level] || colors[0];
-    }
-    if (accuracyEl) {
-      accuracyEl.textContent = accuracyText;
-      const colors = ['rgba(255,255,255,0.25)', 'var(--blood-red)', '#ff8800', '#ffdd00', 'var(--neon-green)'];
-      accuracyEl.style.color = colors[level] || colors[0];
-    }
-    if (hint) {
-      hint.textContent = hintText;
-      const colors = ['rgba(255,255,255,0.5)', 'var(--blood-red)', '#ff8800', '#ffdd00', 'var(--neon-green)'];
-      hint.style.color = colors[level] || colors[0];
-    }
+        // Remove old marker
+        if (marker) map.removeLayer(marker);
 
-    // Light up segments: level N means first N segments are active
-    [s1, s2, s3, s4].forEach((seg, i) => {
-      if (seg) {
-        if (i < level) {
-          seg.classList.add('active');
-        } else {
-          seg.classList.remove('active');
+        // Custom pin icon with drop animation
+        const icon = L.divIcon({
+          className: 'pick-map-pin-wrapper',
+          html: '<div class="pick-map-pin">📍</div><div class="pick-map-pin-label">You are here</div>',
+          iconSize: [40, 50],
+          iconAnchor: [20, 50],
+        });
+
+        marker = L.marker([chosenLat, chosenLng], { icon }).addTo(map);
+
+        // Show coords immediately
+        coordsEl.textContent = `${chosenLat.toFixed(5)}, ${chosenLng.toFixed(5)}`;
+        placeNameEl.textContent = '📍 Looking up place name...';
+        panel.style.display = 'block';
+        deployBtn.disabled = true;
+
+        // Reverse geocode to get the place name
+        const name = await this.doReverseGeocode(chosenLat, chosenLng);
+        if (!resolved) {
+          placeNameEl.textContent = name && name !== 'Unknown area'
+            ? `📍 ${name}`
+            : '📍 Selected location';
+          deployBtn.disabled = false;
         }
-      }
+      });
+
+      // ── Deploy button — confirm location ──
+      deployBtn.addEventListener('click', () => {
+        if (resolved || !chosenLat) return;
+        resolved = true;
+
+        // Hide picker UI, show task pills
+        panel.style.display = 'none';
+        header.style.display = 'none';
+        crosshair.style.display = 'none';
+        tasks.style.display = 'flex';
+        document.getElementById('stask-gps').classList.add('done');
+
+        // Cleanup the picker map
+        map.remove();
+
+        resolve({
+          latitude: chosenLat,
+          longitude: chosenLng,
+          accuracy: 50, // manual tap ≈ 50m precision
+        });
+      });
+
+      // ── Use GPS button — fall back to GPS acquisition ──
+      gpsBtn.addEventListener('click', async () => {
+        if (resolved) return;
+        resolved = true;
+
+        panel.style.display = 'none';
+        header.style.display = 'none';
+        crosshair.style.display = 'none';
+        tasks.style.display = 'flex';
+        map.remove();
+
+        try {
+          const pos = await window.gps.acquirePosition();
+          document.getElementById('stask-gps').classList.add('done');
+          resolve({ latitude: pos.latitude, longitude: pos.longitude, accuracy: pos.accuracy || 30 });
+        } catch {
+          const ipPos = await this.getIPLocation();
+          if (ipPos) {
+            document.getElementById('stask-gps').classList.add('done');
+            resolve({ latitude: ipPos.latitude, longitude: ipPos.longitude, accuracy: ipPos.accuracy || 5000 });
+          } else {
+            const manualPos = await this.showManualLocationDialog();
+            if (manualPos) {
+              document.getElementById('stask-gps').classList.add('done');
+              resolve({ latitude: manualPos.latitude, longitude: manualPos.longitude, accuracy: manualPos.accuracy || 5000 });
+            } else {
+              throw new Error('Could not determine your location.');
+            }
+          }
+        }
+      });
     });
   }
 
@@ -936,31 +926,6 @@ class Game {
       console.warn('IP geolocation failed:', err);
       return null;
     }
-  }
-
-  /**
-   * Update the place name shown on the signal lock screen.
-   * Fires a reverse geocode request to find the current location name.
-   * The geocode method handles rate limiting and caching internally.
-   */
-  updateSignalPlace() {
-    const placeEl = document.getElementById('signal-place');
-    if (!placeEl) return;
-
-    // If we already have a cached name from doReverseGeocode, show it immediately
-    if (this._lastGeocodeName) {
-      placeEl.textContent = `📍 ${this._lastGeocodeName}`;
-      return;
-    }
-
-    // Fire-and-forget the geocode request
-    this.doReverseGeocode().then((name) => {
-      if (name && name !== 'Unknown area') {
-        placeEl.textContent = `📍 ${name}`;
-      }
-    }).catch(() => {
-      // Silently fail — placeholder text stays
-    });
   }
 
   /**

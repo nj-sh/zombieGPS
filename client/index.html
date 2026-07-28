@@ -103,49 +103,51 @@
     </div>
 
     <!-- ════════════════════════════════════════════════════════
-         SIGNAL LOCK — Loading Screen
-         ── The player must achieve good GPS signal to "escape" ──
+         LOCATION PICKER — Tap the map to set your location
+         ── User browses the map and taps where they are ──
          ════════════════════════════════════════════════════════ -->
     <div id="loading-screen">
 
-      <!-- Signal Meter Ring -->
-      <div class="signal-ring-container" id="signal-ring-container">
-        <svg class="signal-ring-svg" viewBox="0 0 200 200">
-          <!-- Background ring -->
-          <circle cx="100" cy="100" r="88" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
-          <!-- Signal segments (4 bars showing signal strength, bottom-left to top-left) -->
-          <!-- Level 1 (None): bottom-left arc -->
-          <path class="signal-segment" id="sig-l1" d="M 50 170 A 88 88 0 0 1 30 100" fill="none" stroke="#c1121f" stroke-width="6" stroke-linecap="round" opacity="0.15"/>
-          <!-- Level 2 (Weak): left arc -->
-          <path class="signal-segment" id="sig-l2" d="M 30 100 A 88 88 0 0 1 50 30" fill="none" stroke="#ff8800" stroke-width="6" stroke-linecap="round" opacity="0.15"/>
-          <!-- Level 3 (Good): top arc -->
-          <path class="signal-segment" id="sig-l3" d="M 50 30 A 88 88 0 0 1 150 30" fill="none" stroke="#ffdd00" stroke-width="6" stroke-linecap="round" opacity="0.15"/>
-          <!-- Level 4 (Excellent): top-right arc -->
-          <path class="signal-segment" id="sig-l4" d="M 150 30 A 88 88 0 0 1 170 100" fill="none" stroke="#39ff14" stroke-width="6" stroke-linecap="round" opacity="0.15"/>
-        </svg>
-        <!-- Center content inside the ring -->
-        <div class="signal-ring-center">
-          <div class="signal-emoji" id="signal-emoji">📡</div>
-          <div class="signal-label" id="signal-label">SEARCHING</div>
-          <div class="signal-accuracy" id="signal-accuracy">-- m</div>
+      <!-- The interactive map for location picking -->
+      <div id="pick-map"></div>
+
+      <!-- Crosshair icon at center (subtle, helps user aim) -->
+      <div class="pick-crosshair" id="pick-crosshair">
+        <div class="pick-crosshair-circle"></div>
+        <div class="pick-crosshair-v"></div>
+        <div class="pick-crosshair-h"></div>
+      </div>
+
+      <!-- Top instruction label -->
+      <div class="pick-header" id="pick-header">
+        <span class="pick-header-icon">📍</span>
+        <span class="pick-header-text">Pinch & zoom, then tap where you are</span>
+      </div>
+
+      <!-- Bottom panel (hidden until a location is selected) -->
+      <div class="pick-panel" id="pick-panel" style="display:none;">
+        <div class="pick-panel-content">
+          <div class="pick-place-name" id="pick-place-name">Detecting...</div>
+          <div class="pick-coords" id="pick-coords">--</div>
+          <div class="pick-accuracy" id="pick-accuracy">📍 Manual pin placement</div>
+          <button class="pick-btn pick-btn-deploy" id="pick-btn-deploy">
+            ✅ DEPLOY HERE
+          </button>
+          <button class="pick-btn pick-btn-gps" id="pick-btn-gps">
+            🛰️ Use phone GPS instead
+          </button>
         </div>
       </div>
 
-      <!-- Place name (reverse-geocoded from GPS position) -->
-      <div class="signal-place" id="signal-place">📍 Detecting location...</div>
-
-      <!-- Hint text (moves based on signal level) -->
-      <div class="signal-hint" id="signal-hint">Searching for GPS satellites...</div>
-
-      <!-- Background task status -->
-      <div class="signal-tasks" id="signal-tasks">
+      <!-- Background loading tasks (shown after deploy) -->
+      <div class="signal-tasks pick-tasks" id="pick-tasks" style="display:none;">
         <div class="signal-task done" id="stask-engine">☣ Engine ✓</div>
-        <div class="signal-task" id="stask-gps">📍 GPS signal...</div>
+        <div class="signal-task" id="stask-gps">📍 Location set</div>
         <div class="signal-task" id="stask-server">🔌 Server...</div>
         <div class="signal-task" id="stask-map">🗺️ Map...</div>
       </div>
 
-      <!-- Location Confirmation Dialog (shown after GPS lock) -->
+      <!-- Fallback dialogs (still exist for GPS path) -->
       <div class="location-confirm" id="location-confirm" style="display:none;">
         <div class="location-confirm-content">
           <div class="location-confirm-icon">📍</div>
@@ -167,30 +169,19 @@
         </div>
       </div>
 
-      <!-- Manual Location Entry (shown when GPS + IP both fail) -->
       <div class="manual-location" id="manual-location" style="display:none;">
         <div class="manual-location-content">
           <div class="manual-location-icon">🌍</div>
           <div class="manual-location-title">Enter Your Location</div>
-          <div class="manual-location-desc">GPS couldn't find you. Type your city or area below to start playing.</div>
+          <div class="manual-location-desc">Type your city or area below to start playing.</div>
           <div class="manual-location-input-group">
-            <input
-              type="text"
-              id="manual-location-input"
-              class="manual-location-input"
-              placeholder="e.g. Mumbai, India or New York, NY"
-              autocomplete="off"
-              spellcheck="false"
-              enterkeyhint="search"
-            >
+            <input type="text" id="manual-location-input" class="manual-location-input" placeholder="e.g. Mumbai, India or New York, NY" autocomplete="off" spellcheck="false" enterkeyhint="search">
             <button class="manual-location-search-btn" id="manual-location-search-btn">🔍 Search</button>
           </div>
           <div class="manual-location-error" id="manual-location-error"></div>
           <div class="manual-location-results" id="manual-location-results"></div>
           <div class="manual-location-buttons">
-            <button class="manual-location-btn manual-location-back" id="manual-location-back">
-              ↩ Cancel
-            </button>
+            <button class="manual-location-btn manual-location-back" id="manual-location-back">↩ Cancel</button>
           </div>
         </div>
       </div>
