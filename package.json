@@ -1,5 +1,5 @@
 {
-  "name": "zombie-apocalypse",
+  "name": "zombiesrv",
   "version": "1.0.0",
   "description": "Real-world GPS multiplayer zombie survival web game",
   "main": "server/index.js",

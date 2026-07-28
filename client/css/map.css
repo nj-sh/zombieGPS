@@ -204,6 +204,18 @@
   display: flex;
 }
 
+/* Picker mode — overrides flex layout for the full-screen Leaflet map */
+#loading-screen.picker-mode {
+  display: block;
+  gap: 0;
+  padding: 0;
+  background: #0a0a0a;
+}
+
+#loading-screen.picker-mode.active {
+  display: block;
+}
+
 /* ── Signal Meter Ring ── */
 .signal-ring-container {
   position: relative;

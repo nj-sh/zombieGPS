@@ -5,7 +5,7 @@ services:
   - type: web
     name: zombie-apocalypse
     runtime: node
-    repo: https://github.com/nj-sh/zombieGPS
+    repo: https://github.com/nj-sh/ZombieSRV
     plan: free
     region: singapore
     buildCommand: npm install
