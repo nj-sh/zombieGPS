@@ -964,17 +964,6 @@ class Game {
   }
 
   /**
-   * Show the location confirmation dialog.
-   * @param {string} placeName - The detected place name.
-   * @param {number} lat - Latitude.
-   * @param {number} lng - Longitude.
-   * @param {number} accuracy - GPS accuracy in meters.
-   * @param {string} [source='gps'] - 'gps' or 'ip'
-   * @returns {Promise<boolean>} true if confirmed, false if retry requested.
-   */
-  showLocationConfirm(placeName, lat, lng, accuracy, source = 'gps') {
-    return new Promise((resolve) => {
-  /**
    * Geocode a text address to coordinates using Nominatim's search API.
    * This lets players type "Mumbai, India" or "5th Avenue, New York" and
    * get back lat/lng coordinates.
