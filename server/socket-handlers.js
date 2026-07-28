@@ -493,11 +493,11 @@ export function setupSocketHandlers(io) {
         socketPlayerMap.delete(socket.id);
         socket.broadcast.emit(SOCKET_EVENTS.PLAYER_LEFT, { id: playerId });
 
-        // Remove player from memory after 5 minutes
-        // This prevents memory leaks from disconnected players
+        // Remove player from memory after 5 minutes (if they haven't reconnected)
+        // Check if playerId is mapped to ANY active socket (handles reconnection)
         setTimeout(() => {
-          const stillDisconnected = !socketPlayerMap.has(socket.id) && activePlayers.has(playerId);
-          if (stillDisconnected) {
+          const isReconnected = Array.from(socketPlayerMap.values()).includes(playerId);
+          if (!isReconnected && activePlayers.has(playerId)) {
             activePlayers.delete(playerId);
             playerSafeZoneState.delete(playerId);
             console.log(`🧹 Cleaned up ${player?.name || playerId} from memory (disconnected >5min)`);
