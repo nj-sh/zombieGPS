@@ -88,45 +88,72 @@ class Game {
       // Step 1: Initialize engine
       await this.loadingStep('Initializing Engine...');
 
-      // Step 2: Request GPS — keep retrying until we get a real position
-      // (No fallback to NYC defaults — game waits for actual GPS)
-      await this.loadingStep('Requesting GPS Permission...', async () => {
-        // Register GPS update listener ONCE (before retry loop to avoid duplicates)
-        window.gps.on('position', (data) => {
-          this.handlePositionUpdate(data);
-        });
-
-        let attempts = 0;
-        const maxAttempts = 3;
-
-        while (attempts < maxAttempts) {
-          attempts++;
-          try {
-            const pos = await window.gps.requestPermission();
-
-            // Accept position if accuracy is null (unknown) or under 200m
-            if (pos.accuracy === null || pos.accuracy < 200) {
-              return pos;
-            }
-
-            // Got a position but low accuracy — retry
-            if (attempts < maxAttempts) {
-              await new Promise(r => setTimeout(r, 2000));
-            }
-          } catch (err) {
-            console.warn(`GPS attempt ${attempts} failed:`, err.message);
-            if (err.code === 1) {
-              // PERMISSION_DENIED — user blocked it, no point retrying
-              throw new Error('GPS permission denied. Please enable location services in your browser settings and reload.');
-            }
-            if (attempts < maxAttempts) {
-              await new Promise(r => setTimeout(r, 2000));
-            }
-          }
-        }
-
-        throw new Error('Could not get GPS position after several attempts. Please move to an open area and reload.');
+      // Register GPS update listener ONCE (before retry loop to avoid duplicates)
+      window.gps.on('position', (data) => {
+        this.handlePositionUpdate(data);
       });
+
+      // Step 2: Request GPS — keep retrying until we get a real position
+      let gpsPos;
+      while (true) {
+        try {
+          gpsPos = await this.loadingStep('Finding Your Location...', async () => {
+            let attempts = 0;
+            const maxAttempts = 3;
+
+            while (attempts < maxAttempts) {
+              attempts++;
+              try {
+                const pos = await window.gps.requestPermission();
+                if (!pos) continue;
+                return pos;
+              } catch (err) {
+                console.warn(`GPS attempt ${attempts} failed:`, err.message);
+                if (err.code === 1) {
+                  throw new Error('GPS permission denied. Please enable location services in your browser settings and reload.');
+                }
+                if (attempts < maxAttempts) {
+                  await new Promise(r => setTimeout(r, 2000));
+                }
+              }
+            }
+            throw new Error('Could not get GPS position. Move to an open area and reload.');
+          });
+
+          // Got GPS — now confirm location with the user
+          await this.loadingStep('Confirming Location...', async () => {
+            // Do reverse geocode to get the place name
+            const placeName = await this.doReverseGeocode(
+              gpsPos.latitude,
+              gpsPos.longitude
+            );
+
+            // Show location confirmation dialog
+            const confirmed = await this.showLocationConfirm(
+              placeName,
+              gpsPos.latitude,
+              gpsPos.longitude,
+              gpsPos.accuracy
+            );
+
+            if (!confirmed) {
+              // User said "No, try again" — throw to retry the outer loop
+              throw new Error('RETRY_GPS');
+            }
+
+            return gpsPos;
+          });
+
+          // User confirmed — break out of the while loop
+          break;
+        } catch (err) {
+          if (err.message === 'RETRY_GPS') {
+            console.log('📍 User rejected location, retrying GPS...');
+            continue; // Retry the whole GPS process
+          }
+          throw err; // Real error, propagate up
+        }
+      }
 
       // Step 3: Connect to server
       await this.loadingStep('Connecting to Server...', async () => {
@@ -784,20 +811,32 @@ class Game {
 
   /**
    * Reverse geocode — use Nominatim to find the current city/place name.
+   * @param {number} [lat] - Optional latitude. If omitted, uses current GPS position.
+   * @param {number} [lng] - Optional longitude. If omitted, uses current GPS position.
+   * @returns {Promise<string>} The place name, or 'Unknown area' if geocode fails.
    */
-  async doReverseGeocode() {
+  async doReverseGeocode(lat, lng) {
     // Rate limit: at most once every 5 seconds (Nominatim policy)
     const now = Date.now();
-    if (this._lastGeocodeTime && now - this._lastGeocodeTime < 5000) return;
+    if (this._lastGeocodeTime && now - this._lastGeocodeTime < 5000) return 'Unknown area';
 
-    const gpsData = window.gps.getPositionData();
-    if (!gpsData) return;
+    let latitude, longitude;
+    if (lat !== undefined && lng !== undefined) {
+      latitude = lat;
+      longitude = lng;
+    } else {
+      const gpsData = window.gps.getPositionData();
+      if (!gpsData) return 'Unknown area';
+      latitude = gpsData.latitude;
+      longitude = gpsData.longitude;
+    }
 
-    const { latitude, longitude } = gpsData;
     const cacheKey = `${latitude.toFixed(3)},${longitude.toFixed(3)}`;
 
     // Throttle: don't re-request if position hasn't changed much (≈100m)
-    if (this._lastGeocodeKey === cacheKey) return;
+    if (this._lastGeocodeKey === cacheKey) {
+      return this._lastGeocodeName || 'Unknown area';
+    }
     this._lastGeocodeKey = cacheKey;
     this._lastGeocodeTime = now;
 
@@ -806,16 +845,70 @@ class Game {
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=16&accept-language=en`,
         { headers: { 'User-Agent': 'ZombieApocalypse/1.0' } }
       );
-      if (!resp.ok) return;
+      if (!resp.ok) return 'Unknown area';
       const data = await resp.json();
 
       let place = data.display_name || '';
       // Shorten: take the first 3 parts of the address (e.g. "Street, District, City")
       const parts = place.split(',').slice(0, 3).map(s => s.trim()).join(', ');
-      window.hud.updateLocation(parts || 'Unknown area');
+      const result = parts || 'Unknown area';
+
+      this._lastGeocodeName = result;
+      window.hud.updateLocation(result);
+      return result;
     } catch (err) {
       console.warn('Geocode error:', err);
+      return 'Unknown area';
     }
+  }
+
+  /**
+   * Show the location confirmation dialog.
+   * @param {string} placeName - The detected place name.
+   * @param {number} lat - Latitude.
+   * @param {number} lng - Longitude.
+   * @param {number} accuracy - GPS accuracy in meters.
+   * @returns {Promise<boolean>} true if confirmed, false if retry requested.
+   */
+  showLocationConfirm(placeName, lat, lng, accuracy) {
+    return new Promise((resolve) => {
+      const dialog = document.getElementById('location-confirm');
+      const nameEl = document.getElementById('location-confirm-name');
+      const coordsEl = document.getElementById('location-confirm-coords');
+      const accuracyEl = document.getElementById('location-confirm-accuracy');
+      const yesBtn = document.getElementById('location-confirm-yes');
+      const noBtn = document.getElementById('location-confirm-no');
+
+      if (!dialog || !nameEl) {
+        resolve(true); // No dialog? Just proceed
+        return;
+      }
+
+      nameEl.textContent = placeName;
+      coordsEl.textContent = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      accuracyEl.textContent = accuracy ? `Accuracy: ±${Math.round(accuracy)}m` : '';
+
+      dialog.style.display = 'flex';
+
+      const cleanup = () => {
+        dialog.style.display = 'none';
+        yesBtn.removeEventListener('click', onYes);
+        noBtn.removeEventListener('click', onNo);
+      };
+
+      const onYes = () => {
+        cleanup();
+        resolve(true);
+      };
+
+      const onNo = () => {
+        cleanup();
+        resolve(false);
+      };
+
+      yesBtn.addEventListener('click', onYes);
+      noBtn.addEventListener('click', onNo);
+    });
   }
 
   /**

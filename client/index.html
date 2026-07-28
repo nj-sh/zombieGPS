@@ -151,6 +151,25 @@
       <div class="loading-progress-container">
         <div class="loading-progress-fill" id="loading-progress-fill"></div>
       </div>
+
+      <!-- Location Confirmation Dialog (shown after GPS lock) -->
+      <div class="location-confirm" id="location-confirm" style="display:none;">
+        <div class="location-confirm-content">
+          <div class="location-confirm-icon">📍</div>
+          <div class="location-confirm-title">Is this your location?</div>
+          <div class="location-confirm-name" id="location-confirm-name">Detecting...</div>
+          <div class="location-confirm-coords" id="location-confirm-coords"></div>
+          <div class="location-confirm-accuracy" id="location-confirm-accuracy"></div>
+          <div class="location-confirm-buttons">
+            <button class="location-confirm-btn location-confirm-yes" id="location-confirm-yes">
+              ✅ Yes, that's me!
+            </button>
+            <button class="location-confirm-btn location-confirm-no" id="location-confirm-no">
+              🔄 No, try again
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ════════════════════════════════════════════════════════
