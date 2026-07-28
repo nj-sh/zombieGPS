@@ -88,52 +88,75 @@ class Game {
       // Step 1: Initialize engine
       await this.loadingStep('Initializing Engine...');
 
-      // Register GPS update listener ONCE (before retry loop to avoid duplicates)
+      // Register GPS update listener ONCE (before acquisition to capture all updates)
       window.gps.on('position', (data) => {
         this.handlePositionUpdate(data);
       });
 
-      // Step 2: Get position — try GPS first, fallback to IP geolocation
+      // Step 2: Acquire position — continuous watchPosition with accuracy improvement
       let gpsPos;
       let locationSource = 'gps';
       while (true) {
         try {
-          gpsPos = await this.loadingStep('Finding Your Location...', async () => {
-            // ── Phase 1: Try GPS (3 attempts) ──
-            let attempts = 0;
-            const maxAttempts = 3;
+          gpsPos = await this.loadingStep('Searching for GPS signal...', async () => {
+            // ── Phase 1: Use watchPosition-based acquisition ──
+            // This fires a continuous watch, waits for accuracy to improve,
+            // applies jitter filtering, and resolves when ready.
 
-            while (attempts < maxAttempts) {
-              attempts++;
-              try {
-                const pos = await window.gps.requestPermission();
-                if (!pos) continue;
-                // GPS success — return the real position
-                return pos;
-              } catch (err) {
-                console.warn(`GPS attempt ${attempts} failed:`, err.message);
-                if (err.code === 1) {
-                  // Permission denied — no point retrying or falling back
-                  throw new Error('GPS permission denied. Please enable location services in your browser settings and reload.');
+            // Listen for live accuracy updates during acquisition
+            const onAcquisitionUpdate = (data) => {
+              if (data.accuracy) {
+                // Update the loading line text to show live accuracy
+                const lines = document.querySelectorAll('.loading-line');
+                const currentLine = lines[this.loadingProgress];
+                if (currentLine) {
+                  const textEl = currentLine.querySelector('.loading-text');
+                  if (textEl) {
+                    const quality = window.gps.getSignalQualityIndicator();
+                    textEl.textContent = `GPS: ${quality.emoji} ${quality.label} (${Math.round(data.accuracy)}m)`;
+                  }
                 }
-                if (attempts < maxAttempts) {
-                  await new Promise(r => setTimeout(r, 2000));
-                }
+                // Update the accuracy indicator bar
+                this.updateGPSAccuracyBar(data.accuracy, data.signalQuality);
               }
-            }
+            };
 
-            // ── Phase 2: GPS all failed — try IP geolocation as fallback ──
-            console.log('📍 GPS failed, trying IP geolocation as fallback...');
-            const ipPos = await this.getIPLocation();
-            if (ipPos) {
-              // Store IP position into the GPS tracker so getPositionData() works
-              window.gps.setPosition(ipPos.latitude, ipPos.longitude, ipPos.accuracy || 5000);
-              // Return with marker so confirmation dialog shows "approximate"
-              return { ...ipPos, isIPBased: true };
-            }
+            window.gps.on('acquisition_update', onAcquisitionUpdate);
 
-            // Both GPS and IP failed — throw
-            throw new Error('Could not get GPS position. Move to an open area and reload.');
+            try {
+              const pos = await window.gps.acquirePosition();
+              // GPS success! Clean up the acquisition listener
+              window.gps.off('acquisition_update', onAcquisitionUpdate);
+              return pos;
+            } catch (gpsErr) {
+              window.gps.off('acquisition_update', onAcquisitionUpdate);
+
+              // Handle specific GPS errors with clear messages
+              if (gpsErr.code === 'GPS_DENIED') {
+                // Permission denied — try IP fallback instead of erroring
+                console.log('📍 GPS permission denied, trying IP geolocation...');
+                // Don't throw — fall through to Phase 2
+              } else if (gpsErr.code === 'GPS_TIMEOUT') {
+                console.log('📍 GPS timed out, trying IP geolocation...');
+                // Fall through to Phase 2
+              } else if (gpsErr.code === 'GPS_UNAVAILABLE') {
+                console.log('📍 GPS unavailable, trying IP geolocation...');
+                // Fall through to Phase 2
+              } else {
+                throw gpsErr; // Unknown error — propagate
+              }
+
+              // ── Phase 2: GPS failed — try IP geolocation as fallback ──
+              console.log('📍 Falling back to IP geolocation...');
+              const ipPos = await this.getIPLocation();
+              if (ipPos) {
+                window.gps.setPosition(ipPos.latitude, ipPos.longitude, ipPos.accuracy || 5000);
+                return { ...ipPos, isIPBased: true };
+              }
+
+              // Both GPS and IP failed
+              throw new Error('Could not determine your location. Make sure location services are enabled and try again.');
+            }
           });
 
           // Remember source for confirmation dialog
@@ -165,7 +188,7 @@ class Game {
             console.log('📍 User rejected location, retrying...');
             continue;
           }
-          throw err; // Real error, propagate up
+          throw err;
         }
       }
 
@@ -249,7 +272,8 @@ class Game {
       this.state = 'playing';
       this.hideLoadingScreen();
       this.startSurvivalTimer();
-      window.gps.startWatching();
+      // GPS watch is already running from acquirePosition() in Step 2
+      // No need to call window.gps.startWatching() again
 
       // Initial reverse geocode
       this.doReverseGeocode();
@@ -337,6 +361,30 @@ class Game {
       screen.classList.remove('active');
       screen.style.opacity = '1';
     }, 500);
+  }
+
+  /**
+   * Update the GPS accuracy indicator on the loading screen.
+   * Shows real-time accuracy and signal quality during acquisition.
+   */
+  updateGPSAccuracyBar(accuracy, signalQuality) {
+    const bar = document.getElementById('gps-accuracy-bar');
+    const text = document.getElementById('gps-accuracy-text');
+    if (!bar || !text) return;
+
+    const quality = window.gps.getSignalQualityIndicator();
+
+    // Update the bar width (inverse: lower accuracy = more filled)
+    // Cap at 100m for the bar — beyond that looks the same
+    const displayAccuracy = Math.min(100, accuracy);
+    const barPercent = 100 - displayAccuracy;
+    bar.style.width = `${barPercent}%`;
+    bar.style.background = quality.color;
+    bar.style.boxShadow = `0 0 8px ${quality.color}`;
+
+    // Update the text
+    text.textContent = `${quality.emoji} ${quality.label} — ${Math.round(accuracy)}m accuracy`;
+    text.style.color = quality.color;
   }
 
   /**
