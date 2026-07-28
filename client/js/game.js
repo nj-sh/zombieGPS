@@ -88,21 +88,44 @@ class Game {
       // Step 1: Initialize engine
       await this.loadingStep('Initializing Engine...');
 
-      // Step 2: Request GPS
+      // Step 2: Request GPS — keep retrying until we get a real position
+      // (No fallback to NYC defaults — game waits for actual GPS)
       await this.loadingStep('Requesting GPS Permission...', async () => {
-        try {
-          const pos = await window.gps.requestPermission();
+        let attempts = 0;
+        const maxAttempts = 5;
 
-          // Listen for GPS updates
-          window.gps.on('position', (data) => {
-            this.handlePositionUpdate(data);
-          });
+        while (attempts < maxAttempts) {
+          attempts++;
+          try {
+            const pos = await window.gps.requestPermission();
 
-          return pos;
-        } catch (err) {
-          console.warn('GPS failed, using default position:', err);
-          return { latitude: 40.7128, longitude: -74.0060 };
+            // Check if accuracy is reasonable (< 100m is good for gameplay)
+            if (pos.accuracy !== null && pos.accuracy < 200) {
+              // Listen for GPS updates
+              window.gps.on('position', (data) => {
+                this.handlePositionUpdate(data);
+              });
+
+              return pos;
+            }
+
+            // Got a position but low accuracy — retry
+            if (attempts < maxAttempts) {
+              await new Promise(r => setTimeout(r, 2000));
+            }
+          } catch (err) {
+            console.warn(`GPS attempt ${attempts} failed:`, err.message);
+            if (err.code === 1) {
+              // PERMISSION_DENIED — user blocked it, no point retrying
+              throw new Error('GPS permission denied. Please enable location services in your browser settings and reload.');
+            }
+            if (attempts < maxAttempts) {
+              await new Promise(r => setTimeout(r, 2000));
+            }
+          }
         }
+
+        throw new Error('Could not get GPS position after several attempts. Please move to an open area and reload.');
       });
 
       // Step 3: Connect to server
@@ -123,7 +146,7 @@ class Game {
 
       // Step 4: Download survivor data
       await this.loadingStep('Downloading Survivor Data...', async () => {
-        const gpsData = window.gps.getPositionData() || { latitude: 40.7128, longitude: -74.0060 };
+        const gpsData = window.gps.getPositionData();
         window.socketManager.joinGame({
           name: playerData.name,
           team: playerData.team,
@@ -145,7 +168,7 @@ class Game {
 
       // Step 5: Load world
       await this.loadingStep('Loading World...', async () => {
-        const gpsData = window.gps.getPositionData() || { latitude: 40.7128, longitude: -74.0060 };
+        const gpsData = window.gps.getPositionData();
         window.mapManager.init(gpsData.latitude, gpsData.longitude);
 
         // Now the player renderer exists — render the local player + all known players

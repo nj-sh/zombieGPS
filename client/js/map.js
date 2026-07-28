@@ -12,7 +12,7 @@ class MapManager {
     this.playerRenderer = null;
     this.isInitialized = false;
     this.currentCenter = [0, 0];
-    this.currentZoom = 16;
+    this.currentZoom = 17;
     this.itemMarkers = new Map();
     this.safeZoneMarkers = new Map();
     this.extractionPointMarkers = new Map();
@@ -56,7 +56,7 @@ class MapManager {
     // OpenStreetMap tiles (works worldwide, includes labels)
     this.tileLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      minZoom: 15,  // Limit zoom out to ~neighborhood level
+      minZoom: 17,  // ~2-3 buildings only — keeps the game location-realistic
       attribution: '&copy; OpenStreetMap contributors',
       noWrap: true,
     });
@@ -64,7 +64,7 @@ class MapManager {
     // Esri Satellite tiles (for satellite mode toggle)
     this.satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
       maxZoom: 19,
-      minZoom: 15,
+      minZoom: 17,
       attribution: '&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
       noWrap: true,
     });
@@ -388,7 +388,7 @@ class MapManager {
       }
       this.labelLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
         maxZoom: 19,
-        minZoom: 15,
+        minZoom: 17,
         attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
         noWrap: true,
         opacity: 0.85,
